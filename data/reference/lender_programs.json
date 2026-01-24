@@ -1,0 +1,362 @@
+[
+  {
+    "lender_id": "ALLY",
+    "lender_name": "Ally Financial",
+    "effective_date": "2026-01-01",
+    "programs": [
+      {
+        "tier": "S",
+        "tier_name": "Super Prime",
+        "min_fico": 750,
+        "max_fico": 850,
+        "max_ltv": 1.20,
+        "rates": [
+          {"term": 60, "apr": 4.99, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 5.49, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "A",
+        "tier_name": "Prime",
+        "min_fico": 700,
+        "max_fico": 749,
+        "max_ltv": 1.15,
+        "rates": [
+          {"term": 60, "apr": 6.49, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 6.99, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "B",
+        "tier_name": "Near Prime",
+        "min_fico": 650,
+        "max_fico": 699,
+        "max_ltv": 1.10,
+        "rates": [
+          {"term": 60, "apr": 8.99, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 9.49, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "C",
+        "tier_name": "Subprime",
+        "min_fico": 600,
+        "max_fico": 649,
+        "max_ltv": 1.05,
+        "rates": [
+          {"term": 60, "apr": 12.99, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 13.99, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi", "por"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "D",
+        "tier_name": "Deep Subprime",
+        "min_fico": 550,
+        "max_fico": 599,
+        "max_ltv": 1.00,
+        "rates": [
+          {"term": 48, "apr": 18.99, "dealer_reserve_cap": 3.0},
+          {"term": 60, "apr": 19.99, "dealer_reserve_cap": 3.0}
+        ],
+        "stips_required": ["poi", "por", "references"],
+        "days_basis": "30/360"
+      }
+    ]
+  },
+  {
+    "lender_id": "CHASE",
+    "lender_name": "Chase Auto Finance",
+    "effective_date": "2026-01-01",
+    "programs": [
+      {
+        "tier": "S",
+        "tier_name": "Super Prime",
+        "min_fico": 750,
+        "max_fico": 850,
+        "max_ltv": 1.25,
+        "rates": [
+          {"term": 60, "apr": 4.49, "dealer_reserve_cap": 1.5},
+          {"term": 72, "apr": 4.99, "dealer_reserve_cap": 1.5}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "A",
+        "tier_name": "Prime",
+        "min_fico": 700,
+        "max_fico": 749,
+        "max_ltv": 1.20,
+        "rates": [
+          {"term": 60, "apr": 5.99, "dealer_reserve_cap": 1.5},
+          {"term": 72, "apr": 6.49, "dealer_reserve_cap": 1.5}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "B",
+        "tier_name": "Near Prime",
+        "min_fico": 650,
+        "max_fico": 699,
+        "max_ltv": 1.10,
+        "rates": [
+          {"term": 60, "apr": 8.49, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 8.99, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": ["poi"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "C",
+        "tier_name": "Subprime",
+        "min_fico": 600,
+        "max_fico": 649,
+        "max_ltv": 1.05,
+        "rates": [
+          {"term": 60, "apr": 11.99, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 12.99, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi", "por"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "D",
+        "tier_name": "Deep Subprime",
+        "min_fico": 550,
+        "max_fico": 599,
+        "max_ltv": 1.00,
+        "rates": [
+          {"term": 48, "apr": 17.99, "dealer_reserve_cap": 3.0},
+          {"term": 60, "apr": 18.99, "dealer_reserve_cap": 3.0}
+        ],
+        "stips_required": ["poi", "por", "references"],
+        "days_basis": "30/360"
+      }
+    ]
+  },
+  {
+    "lender_id": "CAPITAL_ONE",
+    "lender_name": "Capital One Auto Finance",
+    "effective_date": "2026-01-01",
+    "programs": [
+      {
+        "tier": "S",
+        "tier_name": "Super Prime",
+        "min_fico": 750,
+        "max_fico": 850,
+        "max_ltv": 1.20,
+        "rates": [
+          {"term": 60, "apr": 4.79, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 5.29, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "A",
+        "tier_name": "Prime",
+        "min_fico": 700,
+        "max_fico": 749,
+        "max_ltv": 1.15,
+        "rates": [
+          {"term": 60, "apr": 6.29, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 6.79, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "B",
+        "tier_name": "Near Prime",
+        "min_fico": 650,
+        "max_fico": 699,
+        "max_ltv": 1.10,
+        "rates": [
+          {"term": 60, "apr": 9.29, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 9.79, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "C",
+        "tier_name": "Subprime",
+        "min_fico": 600,
+        "max_fico": 649,
+        "max_ltv": 1.05,
+        "rates": [
+          {"term": 60, "apr": 13.29, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 14.29, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi", "por"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "D",
+        "tier_name": "Deep Subprime",
+        "min_fico": 550,
+        "max_fico": 599,
+        "max_ltv": 1.00,
+        "rates": [
+          {"term": 48, "apr": 19.29, "dealer_reserve_cap": 3.0},
+          {"term": 60, "apr": 20.29, "dealer_reserve_cap": 3.0}
+        ],
+        "stips_required": ["poi", "por", "references"],
+        "days_basis": "30/360"
+      }
+    ]
+  },
+  {
+    "lender_id": "FORD_CREDIT",
+    "lender_name": "Ford Motor Credit",
+    "effective_date": "2026-01-01",
+    "programs": [
+      {
+        "tier": "S",
+        "tier_name": "Super Prime",
+        "min_fico": 750,
+        "max_fico": 850,
+        "max_ltv": 1.30,
+        "rates": [
+          {"term": 60, "apr": 3.99, "dealer_reserve_cap": 1.0},
+          {"term": 72, "apr": 4.49, "dealer_reserve_cap": 1.0}
+        ],
+        "stips_required": [],
+        "days_basis": "actual/365"
+      },
+      {
+        "tier": "A",
+        "tier_name": "Prime",
+        "min_fico": 700,
+        "max_fico": 749,
+        "max_ltv": 1.20,
+        "rates": [
+          {"term": 60, "apr": 5.49, "dealer_reserve_cap": 1.5},
+          {"term": 72, "apr": 5.99, "dealer_reserve_cap": 1.5}
+        ],
+        "stips_required": [],
+        "days_basis": "actual/365"
+      },
+      {
+        "tier": "B",
+        "tier_name": "Near Prime",
+        "min_fico": 650,
+        "max_fico": 699,
+        "max_ltv": 1.10,
+        "rates": [
+          {"term": 60, "apr": 7.99, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 8.49, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": ["poi"],
+        "days_basis": "actual/365"
+      },
+      {
+        "tier": "C",
+        "tier_name": "Subprime",
+        "min_fico": 600,
+        "max_fico": 649,
+        "max_ltv": 1.05,
+        "rates": [
+          {"term": 60, "apr": 11.49, "dealer_reserve_cap": 2.5},
+          {"term": 72, "apr": 12.49, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi", "por"],
+        "days_basis": "actual/365"
+      },
+      {
+        "tier": "D",
+        "tier_name": "Deep Subprime",
+        "min_fico": 550,
+        "max_fico": 599,
+        "max_ltv": 1.00,
+        "rates": [
+          {"term": 48, "apr": 16.99, "dealer_reserve_cap": 3.0},
+          {"term": 60, "apr": 17.99, "dealer_reserve_cap": 3.0}
+        ],
+        "stips_required": ["poi", "por", "references"],
+        "days_basis": "actual/365"
+      }
+    ]
+  },
+  {
+    "lender_id": "SOCAL_CU",
+    "lender_name": "SoCal Federal Credit Union",
+    "effective_date": "2026-01-01",
+    "programs": [
+      {
+        "tier": "S",
+        "tier_name": "Super Prime",
+        "min_fico": 750,
+        "max_fico": 850,
+        "max_ltv": 1.15,
+        "rates": [
+          {"term": 60, "apr": 4.25, "dealer_reserve_cap": 0.5},
+          {"term": 72, "apr": 4.75, "dealer_reserve_cap": 0.5}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "A",
+        "tier_name": "Prime",
+        "min_fico": 700,
+        "max_fico": 749,
+        "max_ltv": 1.10,
+        "rates": [
+          {"term": 60, "apr": 5.75, "dealer_reserve_cap": 1.0},
+          {"term": 72, "apr": 6.25, "dealer_reserve_cap": 1.0}
+        ],
+        "stips_required": [],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "B",
+        "tier_name": "Near Prime",
+        "min_fico": 650,
+        "max_fico": 699,
+        "max_ltv": 1.05,
+        "rates": [
+          {"term": 60, "apr": 8.25, "dealer_reserve_cap": 1.5},
+          {"term": 72, "apr": 8.75, "dealer_reserve_cap": 1.5}
+        ],
+        "stips_required": ["poi"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "C",
+        "tier_name": "Subprime",
+        "min_fico": 600,
+        "max_fico": 649,
+        "max_ltv": 1.00,
+        "rates": [
+          {"term": 60, "apr": 11.25, "dealer_reserve_cap": 2.0},
+          {"term": 72, "apr": 12.25, "dealer_reserve_cap": 2.0}
+        ],
+        "stips_required": ["poi", "por"],
+        "days_basis": "30/360"
+      },
+      {
+        "tier": "D",
+        "tier_name": "Deep Subprime",
+        "min_fico": 550,
+        "max_fico": 599,
+        "max_ltv": 0.95,
+        "rates": [
+          {"term": 48, "apr": 15.75, "dealer_reserve_cap": 2.5},
+          {"term": 60, "apr": 16.75, "dealer_reserve_cap": 2.5}
+        ],
+        "stips_required": ["poi", "por", "references"],
+        "days_basis": "30/360"
+      }
+    ]
+  }
+]

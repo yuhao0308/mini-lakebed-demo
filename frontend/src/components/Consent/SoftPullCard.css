@@ -1,0 +1,197 @@
+/**
+ * T03: SoftPullCard Styles
+ *
+ * Styling for FCRA consent UI component.
+ */
+
+.soft-pull-card {
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 16px 0;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  max-width: 500px;
+}
+
+.soft-pull-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.soft-pull-icon {
+  font-size: 24px;
+}
+
+.soft-pull-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+
+.soft-pull-content {
+  margin-bottom: 20px;
+}
+
+.consent-intro {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.consent-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.consent-text {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+
+.consent-highlight {
+  font-size: 14px;
+  color: #059669;
+  margin: 0;
+  padding: 8px 12px;
+  background: #ecfdf5;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.consent-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+
+.consent-checkbox input[type="checkbox"] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.consent-checkbox span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.soft-pull-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.soft-pull-actions .btn-primary {
+  flex: 1;
+  padding: 12px 24px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.soft-pull-actions .btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.soft-pull-actions .btn-primary:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.soft-pull-actions .btn-secondary {
+  padding: 12px 24px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.soft-pull-actions .btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.soft-pull-actions .btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.soft-pull-disclaimer {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .soft-pull-card {
+    background: #1e293b;
+    border-color: #3b82f6;
+  }
+
+  .soft-pull-header {
+    border-bottom-color: #334155;
+  }
+
+  .soft-pull-header h3 {
+    color: #f1f5f9;
+  }
+
+  .consent-intro {
+    color: #94a3b8;
+  }
+
+  .consent-box {
+    background: #0f172a;
+    border-color: #334155;
+  }
+
+  .consent-text {
+    color: #cbd5e1;
+  }
+
+  .consent-checkbox {
+    color: #cbd5e1;
+  }
+
+  .soft-pull-actions .btn-secondary {
+    background: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+  }
+
+  .soft-pull-actions .btn-secondary:hover:not(:disabled) {
+    background: #475569;
+  }
+
+  .soft-pull-disclaimer {
+    color: #94a3b8;
+  }
+}

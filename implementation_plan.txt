@@ -1,0 +1,956 @@
+# Mini-Lakebed Demo MVP: Inventory Q&A + Payment Estimates
+
+End-to-end implementation plan for a governed agentic AI demo running on **Mac mini M4** with **$0 budget**. This plan covers both (A) Inventory Q&A and (B) Payment Estimates using approved lender rules only.
+
+---
+
+## 0) Operating Constraint: Decision Framework
+
+| Decision Point | Options | This Plan |
+|---|---|---|
+| LLM | Local (Ollama) vs Free Cloud (Gemini/Groq) | **Local-first** |
+| Database | SQLite vs Postgres | **Local-first (SQLite)** |
+| Embeddings | Local (Nomic/all-MiniLM) vs Cloud | **Local-first** |
+| Vector Store | FAISS/Chroma vs Pinecone Free | **Local-first (ChromaDB)** |
+| Backend | Python FastAPI local | **Local-first** |
+| Frontend | React/Vite local dev | **Local-first** |
+
+> [!NOTE]
+> **Rationale**: Mac mini M4 has excellent local ML performance (Neural Engine + unified memory). Local-first minimizes latency, eliminates API costs, and allows offline development. Fallbacks documented per section.
+
+---
+
+## 1) Combined Demo Scope
+
+### 1.1 What We WILL Demo
+
+#### Option A: Inventory Q&A
+- Search vehicles by make, model, year, price range, body style, color
+- Filter by specific attributes (mileage, fuel type, transmission)
+- Find "similar vehicles" based on criteria
+- Show availability status (in-stock, sold, reserved)
+- Natural language queries: "Show me SUVs under $30k with low mileage"
+
+#### Option B: Payment Estimates
+- Calculate monthly payment using **only approved synthetic lender rules**
+- Quote based on: vehicle price, down payment, credit tier, term length
+- Show APR, total interest, total cost breakdown
+- Display calculation trace with rule ID citations
+- Refuse to quote when no matching rule exists
+
+### 1.2 What is EXPLICITLY Out of Scope
+
+| Excluded Feature | Why |
+|---|---|
+| Trade-in valuation | Requires external market data APIs (cost) |
+| Real credit pulls (soft/hard) | Requires 700Credit/Experian integration |
+| Identity verification (KYC) | Compliance complexity |
+| Real lender integrations | No access to RouteOne/Dealertrack |
+| Adverse action notices | Requires real credit decisions |
+| Service scheduling | Different domain, adds scope |
+| Multi-dealership inventory | Single synthetic dataset sufficient |
+
+### 1.3 Unified User Journey
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  USER INTENT              │  SYSTEM ACTION                      │
+├───────────────────────────┼─────────────────────────────────────┤
+│  "Show me trucks"         │  Inventory Search → Results List    │
+│  "Tell me about VIN X"    │  Get Vehicle Details               │
+│  "What's the payment?"    │  Collect: down payment, credit tier │
+│  "720 credit, $5k down"   │  Query Lender Rules → Calculate     │
+│  "How was that calculated"│  Show Rule ID + Formula Trace       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2) Demo UX and User Journey
+
+### 2.1 Step-by-Step User Journey (8 Steps)
+
+1. **User opens chat interface** → Welcome message with suggested queries
+2. **User asks inventory question** → "What SUVs do you have under $35,000?"
+3. **System returns filtered results** → 5-10 matching vehicles with key specs
+4. **User selects a vehicle** → "Tell me more about the 2023 Honda CR-V"
+5. **System shows vehicle details** → Full specs, price, availability
+6. **User asks about payment** → "What would my monthly payment be?"
+7. **System collects inputs** → Asks for down payment & credit estimate
+8. **System returns payment estimate** → Monthly payment + calculation trace + disclaimers
+
+### 2.2 Example User Questions (10)
+
+| # | Type | User Question |
+|---|---|---|
+| 1 | Inventory | "Show me all trucks under $40,000" |
+| 2 | Inventory | "Do you have any red sedans?" |
+| 3 | Inventory | "What's your cheapest SUV?" |
+| 4 | Inventory | "Find cars with less than 30,000 miles" |
+| 5 | Inventory | "What vehicles are similar to a Toyota Camry?" |
+| 6 | Payment | "What would my payment be on this car?" |
+| 7 | Payment | "I have good credit and $3,000 down" |
+| 8 | Payment | "Can you show me 48 vs 60 month options?" |
+| 9 | Payment | "How did you calculate that payment?" |
+| 10 | Payment | "What if I put $5,000 down instead?" |
+
+### 2.3 Example System Responses (10)
+
+| # | Response Summary |
+|---|---|
+| 1 | "I found 8 trucks under $40,000. Here are the top matches: [list with make/model/year/price]" |
+| 2 | "We have 3 red sedans in stock: [list]. Would you like details on any of these?" |
+| 3 | "Our most affordable SUV is the 2021 Nissan Rogue at $22,500. [specs]" |
+| 4 | "Here are 12 vehicles with under 30,000 miles: [filtered list]" |
+| 5 | "Based on the Camry's profile, similar vehicles include: Honda Accord, Mazda 6, Hyundai Sonata [with prices]" |
+| 6 | "I can estimate your payment. What's your estimated credit score range and down payment?" |
+| 7 | "With good credit (700-749) and $3,000 down on this $28,000 vehicle, your estimated payment is **$485/mo** for 60 months at 6.49% APR. [Rule ID: SYNTH-PRIME-60]" |
+| 8 | "Here's a comparison: 48mo = $595/mo (5.99% APR) vs 60mo = $485/mo (6.49% APR). The shorter term saves $1,420 in total interest." |
+| 9 | "This estimate used Rule SYNTH-PRIME-60: Base APR 6.49% for FICO 700-749, 60-month term, 90% LTV. Formula: PMT = P × [r(1+r)^n] / [(1+r)^n – 1]" |
+| 10 | "With $5,000 down, your payment drops to **$445/mo** (same 6.49% APR). You'd save $2,400 over the loan term." |
+
+### 2.2 Example User Questions (10)
+
+| # | Type | User Question |
+|---|---|---|
+| 1 | Inventory | "Show me all trucks under $40,000" |
+| 2 | Inventory | "Do you have any red sedans?" |
+| 3 | Inventory | "What's your cheapest SUV?" |
+| 4 | Inventory | "Find cars with less than 30,000 miles" |
+| 5 | Inventory | "What vehicles are similar to a Toyota Camry?" |
+| 6 | Payment | "What would my payment be on this car?" |
+| 7 | Payment | "I have good credit and $3,000 down" |
+| 8 | Payment | "Can you show me 48 vs 60 month options?" |
+| 9 | Payment | "How did you calculate that payment?" |
+| 10 | Payment | "What if I put $5,000 down instead?" |
+
+### 2.3 Example System Responses (10)
+
+| # | Response Summary |
+|---|---|
+| 1 | "I found 8 trucks under $40,000. Here are the top matches: [list with make/model/year/price]" |
+| 2 | "We have 3 red sedans in stock: [list]. Would you like details on any of these?" |
+| 3 | "Our most affordable SUV is the 2021 Nissan Rogue at $22,500. [specs]" |
+| 4 | "Here are 12 vehicles with under 30,000 miles: [filtered list]" |
+| 5 | "Based on the Camry's profile, similar vehicles include: Honda Accord, Mazda 6, Hyundai Sonata [with prices]" |
+| 6 | "I can estimate your payment. What's your estimated credit score range and down payment?" |
+| 7 | "With good credit (700-749) and $3,000 down on this $28,000 vehicle, your estimated payment is **$485/mo** for 60 months at 6.49% APR. [Rule ID: SYNTH-PRIME-60]" |
+| 8 | "Here's a comparison: 48mo = $595/mo (5.99% APR) vs 60mo = $485/mo (6.49% APR). The shorter term saves $1,420 in total interest." |
+| 9 | "This estimate used Rule SYNTH-PRIME-60: Base APR 6.49% for FICO 700-749, 60-month term, 90% LTV. Formula: PMT = P × [r(1+r)^n] / [(1+r)^n – 1]" |
+| 10 | "With $5,000 down, your payment drops to **$445/mo** (same 6.49% APR). You'd save $2,400 over the loan term." |
+
+### 2.4 Edge Cases & Failure Behaviors
+
+| Scenario | System Response |
+|---|---|
+| No matching inventory | "I couldn't find vehicles matching those criteria. Try broadening your search—for example, increasing the price range or including more body styles." |
+| Credit tier not in rules | "I don't have approved rates for that credit profile. Please speak with our finance team for personalized options." |
+| Ambiguous input | "I want to make sure I understand. Are you asking about: (A) vehicle availability, or (B) payment estimates?" |
+| Missing required input | "To calculate your payment, I need: (1) your estimated credit range, and (2) your down payment amount." |
+| LTV exceeds maximum | "Based on the down payment, this exceeds our maximum loan-to-value ratio. A larger down payment of at least $X would be required." |
+| Vehicle sold | "This vehicle was recently sold. Here are 3 similar alternatives currently in stock." |
+
+---
+
+## 3) Architecture (Demo-Scale)
+
+### 3.1 Decision: Local-first for All Components
+
+| Component | Choice | Rationale | Fallback |
+|---|---|---|---|
+| **UI** | React + Vite | Fast dev, runs locally | Next.js if SSR needed |
+| **Backend API** | Python FastAPI | Async, easy LLM integration | Flask if simpler needed |
+| **Database** | SQLite | Zero config, file-based, sufficient for demo | Postgres via Docker |
+| **Vector Store** | ChromaDB | Local, Python-native, free | FAISS if Chroma issues |
+| **LLM** | Ollama (llama3.2 or mistral) | M4 optimized, runs offline | Gemini 1.5 Flash (free tier) |
+| **Embeddings** | nomic-embed-text (Ollama) | Local, fast on M4 | all-MiniLM-L6-v2 via sentence-transformers |
+| **Payment Calc** | Pure Python module | Deterministic, no LLM | Same |
+| **Logging** | Python logging + SQLite audit table | Simple, queryable | Same |
+
+### 3.2 ASCII Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              MINI-LAKEBED DEMO                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐      ┌─────────────────────────────────────────────────┐  │
+│  │   React +   │      │                  FastAPI Backend                 │  │
+│  │   Vite UI   │◄────►│  /chat  /search_inventory  /estimate_payment    │  │
+│  │  (Chat UI)  │ HTTP │                                                  │  │
+│  └─────────────┘      └────────────────────┬────────────────────────────┘  │
+│                                            │                                │
+│        ┌───────────────────────────────────┼───────────────────────────┐   │
+│        │                                   │                           │   │
+│        ▼                                   ▼                           ▼   │
+│  ┌───────────┐                    ┌──────────────┐            ┌──────────┐ │
+│  │  Ollama   │                    │  Agent/Tool  │            │ Payment  │ │
+│  │   LLM     │◄──────────────────►│   Router     │───────────►│Calculator│ │
+│  │(llama3.2) │  Intent Parsing    │              │            │ (Python) │ │
+│  └───────────┘                    └──────┬───────┘            └────┬─────┘ │
+│        ▲                                 │                         │       │
+│        │                                 ▼                         │       │
+│  ┌───────────┐                    ┌──────────────┐                 │       │
+│  │  Ollama   │                    │   ChromaDB   │                 │       │
+│  │Embeddings │───────────────────►│ (Inventory   │                 │       │
+│  │  (nomic)  │                    │  Vectors)    │                 │       │
+│  └───────────┘                    └──────────────┘                 │       │
+│                                                                    │       │
+│  ┌──────────────────────────────────────────────────────────────┐  │       │
+│  │                        SQLite Database                        │  │       │
+│  │  ┌────────────┐  ┌─────────────┐  ┌────────────┐  ┌────────┐ │  │       │
+│  │  │ inventory  │  │lender_rules │  │ audit_logs │  │vehicles│ │◄─┘       │
+│  │  └────────────┘  └─────────────┘  └────────────┘  └────────┘ │          │
+│  └──────────────────────────────────────────────────────────────┘          │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         GOVERNANCE LAYER                             │   │
+│  │  • Allowlisted tools only   • Schema validation   • Response checks  │   │
+│  │  • Rule ID citation required   • Calculation verification            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4) Data Plan (No Existing Data)
+
+### 4.1 Inventory & Vehicle Data
+
+**Decision: Local-first with Synthetic Generator**
+
+| Option | Pros | Cons | Decision |
+|---|---|---|---|
+| Public API (NHTSA) | Real VIN decoding | Rate limits, incomplete for inventory | Hybrid |
+| Synthetic generator | Full control, demo-ready | Not "real" | **Primary** |
+
+**Approach**: Generate 50-100 synthetic vehicles using a Python script. Use NHTSA VIN decoder API (free, no key required) to validate make/model/year combinations are realistic.
+
+#### Required Schema: `inventory` table
+
+```sql
+CREATE TABLE inventory (
+    id INTEGER PRIMARY KEY,
+    vin TEXT UNIQUE,              -- 17-char synthetic VIN
+    make TEXT NOT NULL,           -- e.g., "Toyota"
+    model TEXT NOT NULL,          -- e.g., "Camry"
+    year INTEGER NOT NULL,        -- e.g., 2023
+    trim TEXT,                    -- e.g., "SE"
+    body_style TEXT,              -- "sedan", "suv", "truck", "coupe"
+    exterior_color TEXT,
+    interior_color TEXT,
+    mileage INTEGER,
+    price REAL NOT NULL,          -- Asking price in USD
+    msrp REAL,                    -- Original MSRP
+    fuel_type TEXT,               -- "gasoline", "hybrid", "electric"
+    transmission TEXT,            -- "automatic", "manual"
+    drivetrain TEXT,              -- "FWD", "AWD", "RWD", "4WD"
+    engine TEXT,                  -- e.g., "2.5L 4-Cylinder"
+    status TEXT DEFAULT 'available', -- "available", "sold", "reserved"
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Sample Rows
+
+| vin | make | model | year | price | body_style | mileage | status |
+|---|---|---|---|---|---|---|---|
+| 1HGCV1F34PA000001 | Honda | Accord | 2023 | 28500 | sedan | 12500 | available |
+| 5TFCZ5AN1NX000002 | Toyota | Tacoma | 2022 | 38900 | truck | 8200 | available |
+| 1N4BL4BV8NN000003 | Nissan | Altima | 2022 | 24200 | sedan | 31000 | available |
+
+#### Data Quality Checks
+- VIN format validation (17 chars, valid characters)
+- Price > 0 and < 200,000
+- Year between 2018 and 2025
+- Mileage >= 0
+- Status in allowed values
+
+#### Update Strategy
+- Static for demo (loaded once at startup)
+- Optional: Admin endpoint to mark vehicles as "sold"
+
+---
+
+### 4.2 Lender Rules Data
+
+**Decision: Synthetic, Demo-Only, Clearly Labeled**
+
+> [!CAUTION]
+> All lender rules are **SYNTHETIC** and for **DEMONSTRATION PURPOSES ONLY**. They do not represent real lender products, rates, or approval criteria.
+
+#### Required Schema: `lender_rules` table
+
+```sql
+CREATE TABLE lender_rules (
+    id INTEGER PRIMARY KEY,
+    rule_id TEXT UNIQUE NOT NULL,    -- e.g., "SYNTH-PRIME-60"
+    lender_name TEXT NOT NULL,       -- e.g., "Demo Capital"
+    program_name TEXT,               -- e.g., "Standard Auto"
+    credit_tier TEXT NOT NULL,       -- "super_prime", "prime", "near_prime", "subprime"
+    min_fico INTEGER NOT NULL,       -- e.g., 720
+    max_fico INTEGER NOT NULL,       -- e.g., 850
+    min_term_months INTEGER,         -- e.g., 24
+    max_term_months INTEGER,         -- e.g., 72
+    base_apr REAL NOT NULL,          -- e.g., 5.49
+    max_ltv REAL NOT NULL,           -- e.g., 1.20 (120%)
+    min_loan_amount REAL,            -- e.g., 5000
+    max_loan_amount REAL,            -- e.g., 75000
+    doc_fee REAL DEFAULT 0,          -- e.g., 495
+    acquisition_fee REAL DEFAULT 0,  -- e.g., 0
+    is_demo BOOLEAN DEFAULT TRUE,    -- Always TRUE for this system
+    effective_date DATE,
+    expiration_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Sample Rows
+
+| rule_id | lender_name | credit_tier | min_fico | max_fico | max_term | base_apr | max_ltv |
+|---|---|---|---|---|---|---|---|
+| SYNTH-SPRIME-60 | Demo Capital | super_prime | 750 | 850 | 60 | 4.99 | 1.10 |
+| SYNTH-PRIME-60 | Demo Capital | prime | 700 | 749 | 60 | 6.49 | 1.15 |
+| SYNTH-NPRIME-60 | Demo Capital | near_prime | 650 | 699 | 60 | 9.99 | 1.05 |
+| SYNTH-SPRIME-72 | Demo Capital | super_prime | 750 | 850 | 72 | 5.49 | 1.10 |
+| SYNTH-PRIME-72 | Demo Capital | prime | 700 | 749 | 72 | 6.99 | 1.10 |
+
+#### UI + README Disclaimers
+
+Every response involving payment estimates must include:
+```
+⚠️ DEMO ONLY: This estimate uses synthetic lender rules for demonstration. 
+Actual rates, terms, and approval depend on real lender review. 
+Not a commitment to lend.
+```
+
+---
+
+## 5) "Approved Lender Rules Only" Mechanism
+
+### 5.1 Rule Selection Logic
+
+```python
+def select_lender_rule(fico_score: int, term_months: int, ltv: float) -> LenderRule | None:
+    """
+    Select the best matching lender rule. Returns None if no rule matches.
+    
+    Priority: Lowest APR among matching rules
+    """
+    query = """
+        SELECT * FROM lender_rules
+        WHERE ? BETWEEN min_fico AND max_fico
+          AND ? BETWEEN min_term_months AND max_term_months
+          AND ? <= max_ltv
+          AND is_demo = TRUE
+          AND (expiration_date IS NULL OR expiration_date >= DATE('now'))
+        ORDER BY base_apr ASC
+        LIMIT 1
+    """
+    return db.execute(query, (fico_score, term_months, ltv)).fetchone()
+```
+
+### 5.2 Payment Calculation Formula
+
+**Standard Amortizing Loan Formula**:
+
+```
+Monthly Payment = P × [r(1+r)^n] / [(1+r)^n – 1]
+
+Where:
+  P = Principal (vehicle price - down payment + fees)
+  r = Monthly interest rate (APR / 12 / 100)
+  n = Number of months (term)
+```
+
+**Explicit Assumptions**:
+- Simple interest, fully amortizing
+- No prepayment penalties
+- Fees added to principal
+- Tax/title not included (disclosed)
+
+```python
+def calculate_payment(
+    vehicle_price: float,
+    down_payment: float,
+    apr: float,
+    term_months: int,
+    fees: float = 0
+) -> PaymentResult:
+    """Deterministic payment calculation with full audit trail."""
+    principal = vehicle_price - down_payment + fees
+    monthly_rate = apr / 100 / 12
+    
+    if monthly_rate == 0:
+        monthly_payment = principal / term_months
+    else:
+        monthly_payment = principal * (
+            (monthly_rate * (1 + monthly_rate) ** term_months) /
+            ((1 + monthly_rate) ** term_months - 1)
+        )
+    
+    total_paid = monthly_payment * term_months + down_payment
+    total_interest = total_paid - vehicle_price - fees
+    
+    return PaymentResult(
+        monthly_payment=round(monthly_payment, 2),
+        principal=principal,
+        apr=apr,
+        term_months=term_months,
+        total_interest=round(total_interest, 2),
+        total_cost=round(total_paid, 2)
+    )
+```
+
+### 5.3 Response "Proof" Format
+
+Every payment estimate response MUST include:
+
+```json
+{
+  "estimate": {
+    "monthly_payment": 485.00,
+    "apr": 6.49,
+    "term_months": 60,
+    "total_interest": 1100.00,
+    "total_cost": 34100.00
+  },
+  "audit": {
+    "rule_id": "SYNTH-PRIME-60",
+    "lender": "Demo Capital",
+    "matched_criteria": {
+      "fico_range": "700-749",
+      "term": 60,
+      "ltv": 0.89
+    },
+    "calculation_trace": {
+      "vehicle_price": 28000,
+      "down_payment": 3000,
+      "principal": 25000,
+      "monthly_rate": 0.00541,
+      "formula": "P × [r(1+r)^n] / [(1+r)^n – 1]"
+    }
+  },
+  "disclaimer": "DEMO ONLY: Synthetic rules for demonstration purposes."
+}
+```
+
+### 5.4 Failure Behavior
+
+| Failure Condition | Response |
+|---|---|
+| No matching rule | "I cannot provide an estimate for this scenario. Our demo lender rules don't cover [specific gap]. Please adjust your inputs or speak with a finance specialist." |
+| LTV too high | "The down payment of $X results in a loan-to-value ratio of Y%, which exceeds our maximum of Z%. A minimum down payment of $W is required." |
+| Term not available | "Terms of [X] months are not available for this credit tier. Available terms: 48, 60, 72 months." |
+
+---
+
+## 6) Agent Workflow (LLM Role + Governance)
+
+### 6.1 What the LLM DOES
+
+| Function | Description |
+|---|---|
+| **Intent parsing** | Classify user message: inventory_search, vehicle_details, payment_estimate, clarification, out_of_scope |
+| **Slot filling** | Extract entities: make, model, year, price range, credit tier, down payment |
+| **Tool routing** | Decide which tool/function to call based on intent |
+| **Explanation** | Generate natural language explanation of results returned by tools |
+| **Disambiguation** | Ask clarifying questions when input is ambiguous |
+
+### 6.2 What the LLM must NOT DO
+
+| Prohibited Action | Enforcement |
+|---|---|
+| Invent inventory | Only return vehicles from database query results |
+| Invent APR/rates | Only use rates from matched lender_rules |
+| Invent loan terms | Only offer terms present in matching rules |
+| Make approval decisions | System provides estimates only, never "approved" language |
+| Provide tax/title amounts | Out of scope, explicitly disclaimed |
+
+### 6.3 Available Tools (Allowlisted)
+
+```python
+ALLOWED_TOOLS = [
+    "search_inventory",      # Query inventory with filters
+    "get_vehicle_by_id",     # Get single vehicle details
+    "get_vehicle_by_vin",    # Get vehicle by VIN
+    "find_similar_vehicles", # Semantic similarity search
+    "estimate_payment",      # Calculate payment using lender rules
+    "list_available_terms",  # Show available terms for credit tier
+    "explain_calculation",   # Return calculation trace
+]
+```
+
+### 6.4 Guardrails
+
+| Guardrail | Implementation |
+|---|---|
+| **Allowlisted tools** | Tool calls validated against ALLOWED_TOOLS list |
+| **Schema validation** | All tool inputs validated with Pydantic models |
+| **Response templates** | Payment responses use structured templates with required fields |
+| **Calculation verification** | Python recalculates payment before sending response; if LLM-generated number differs, correction is applied |
+| **Refusal paths** | Explicit responses for out-of-scope requests |
+| **Disclaimer injection** | Payment responses automatically append demo disclaimer |
+
+### 6.5 Tool/Capability Decisions
+
+| Component | Decision | Rationale | Fallback |
+|---|---|---|---|
+| **LLM (intent/generation)** | Local-first: Ollama llama3.2:8b | M4 handles 8B well, ~30 tok/s | Gemini 1.5 Flash free tier |
+| **Function calling** | Custom JSON schema extraction | Simpler than LangChain for demo | LangChain if complexity grows |
+| **Vector search** | Local-first: ChromaDB | Python-native, no server | FAISS if Chroma has issues |
+| **Embeddings** | Local-first: nomic-embed-text | Fast on M4, good quality | sentence-transformers all-MiniLM |
+
+---
+
+## 7) APIs, Schemas, and Contracts
+
+### 7.1 Database Tables Summary
+
+| Table | Purpose | Key Columns |
+|---|---|---|
+| `inventory` | Vehicle listings | vin, make, model, year, price, status |
+| `lender_rules` | Synthetic financing rules | rule_id, credit_tier, apr, max_ltv |
+| `audit_logs` | Request/response logging | session_id, action, request, response, rule_id |
+| `sessions` | Chat session tracking | session_id, created_at, messages_count |
+
+#### `audit_logs` schema
+
+```sql
+CREATE TABLE audit_logs (
+    id INTEGER PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    action TEXT NOT NULL,          -- "inventory_search", "payment_estimate", etc.
+    user_input TEXT,
+    request_params TEXT,           -- JSON of tool call params
+    response_data TEXT,            -- JSON of response
+    rule_id TEXT,                  -- If payment estimate, which rule was used
+    calculation_trace TEXT,        -- JSON of calculation details
+    error TEXT                     -- Error message if any
+);
+```
+
+### 7.2 API Endpoints
+
+#### `POST /chat`
+Main conversational endpoint.
+
+**Request:**
+```json
+{
+  "session_id": "abc123",
+  "message": "Show me SUVs under $35,000"
+}
+```
+
+**Response:**
+```json
+{
+  "session_id": "abc123",
+  "response": "I found 6 SUVs under $35,000. Here are the top matches:\n\n1. **2023 Honda CR-V EX** - $32,500 (12,400 mi)\n2. **2022 Toyota RAV4 LE** - $29,800 (18,200 mi)\n...",
+  "tool_calls": [
+    {
+      "tool": "search_inventory",
+      "params": {"body_style": "suv", "max_price": 35000},
+      "result_count": 6
+    }
+  ],
+  "metadata": {
+    "intent": "inventory_search",
+    "processing_time_ms": 450
+  }
+}
+```
+
+#### `GET /search_inventory`
+Direct inventory search (bypasses LLM).
+
+**Parameters:**
+| Param | Type | Description |
+|---|---|---|
+| make | string | Filter by make |
+| model | string | Filter by model |
+| min_year | int | Minimum year |
+| max_year | int | Maximum year |
+| min_price | float | Minimum price |
+| max_price | float | Maximum price |
+| body_style | string | sedan, suv, truck, coupe |
+| max_mileage | int | Maximum mileage |
+| limit | int | Results limit (default 10) |
+
+**Response:**
+```json
+{
+  "count": 6,
+  "vehicles": [
+    {
+      "id": 1,
+      "vin": "1HGCV1F34PA000001",
+      "make": "Honda",
+      "model": "CR-V",
+      "year": 2023,
+      "trim": "EX",
+      "price": 32500,
+      "mileage": 12400,
+      "body_style": "suv",
+      "status": "available"
+    }
+  ]
+}
+```
+
+#### `GET /vehicle/{id}`
+Get single vehicle details.
+
+**Response:**
+```json
+{
+  "id": 1,
+  "vin": "1HGCV1F34PA000001",
+  "make": "Honda",
+  "model": "CR-V",
+  "year": 2023,
+  "trim": "EX",
+  "body_style": "suv",
+  "exterior_color": "Crystal Black Pearl",
+  "interior_color": "Black",
+  "mileage": 12400,
+  "price": 32500,
+  "msrp": 35000,
+  "fuel_type": "gasoline",
+  "transmission": "automatic",
+  "drivetrain": "AWD",
+  "engine": "1.5L Turbo 4-Cylinder",
+  "status": "available"
+}
+```
+
+#### `POST /estimate_payment`
+Calculate payment estimate.
+
+**Request:**
+```json
+{
+  "vehicle_id": 1,
+  "down_payment": 5000,
+  "credit_tier": "prime",
+  "fico_estimate": 720,
+  "term_months": 60
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "estimate": {
+    "monthly_payment": 485.00,
+    "apr": 6.49,
+    "term_months": 60,
+    "principal": 27500,
+    "total_interest": 1600.00,
+    "total_cost": 34100.00
+  },
+  "audit": {
+    "rule_id": "SYNTH-PRIME-60",
+    "lender": "Demo Capital",
+    "vehicle_price": 32500,
+    "down_payment": 5000,
+    "ltv": 0.846,
+    "calculation_formula": "P × [r(1+r)^n] / [(1+r)^n – 1]"
+  },
+  "disclaimer": "⚠️ DEMO ONLY: Synthetic lender rules for demonstration purposes. Not a commitment to lend."
+}
+```
+
+**Response (No Matching Rule):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NO_MATCHING_RULE",
+    "message": "No lender rules match the provided credit profile and term.",
+    "details": {
+      "fico_estimate": 580,
+      "term_months": 60,
+      "available_tiers": ["super_prime", "prime", "near_prime"]
+    }
+  }
+}
+```
+
+#### `GET /health`
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "components": {
+    "database": "ok",
+    "llm": "ok",
+    "vector_store": "ok"
+  }
+}
+```
+
+### 7.3 Error Response Format
+
+All errors follow this structure:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message",
+    "details": {}
+  }
+}
+```
+
+| Error Code | HTTP Status | Description |
+|---|---|---|
+| VALIDATION_ERROR | 400 | Invalid request parameters |
+| VEHICLE_NOT_FOUND | 404 | Vehicle ID/VIN not in inventory |
+| NO_MATCHING_RULE | 422 | No lender rule matches criteria |
+| LTV_EXCEEDED | 422 | Loan-to-value ratio too high |
+| INTERNAL_ERROR | 500 | Unexpected server error |
+
+---
+
+## 8) Build Plan with Milestones
+
+### Milestone Overview
+
+| Milestone | Focus | Deliverables |
+|---|---|---|
+| **M0** | Environment Setup | Dev environment, Ollama, dependencies |
+| **M1** | Data Layer | SQLite schema, seed data, basic queries |
+| **M2** | Payment Calculator | Deterministic calculation, rule matching |
+| **M3** | Inventory Search | API endpoints, vector search |
+| **M4** | LLM Integration | Intent parsing, tool routing |
+| **M5** | Chat UI | React frontend, full flow |
+| **M6** | Governance & Polish | Guardrails, audit logs, disclaimers |
+
+---
+
+### M0: Environment Setup
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Install Ollama on M4 Mac | Ollama running | `ollama run llama3.2` responds | S |
+| Pull required models | llama3.2, nomic-embed-text | Models downloaded, respond to queries | S |
+| Create Python project structure | FastAPI skeleton | `uvicorn main:app` starts | S |
+| Set up React + Vite frontend | React app scaffold | `npm run dev` shows welcome page | S |
+| Create SQLite database file | Empty DB with schema | Schema script runs without error | S |
+
+**Decision: Local-first**
+- Ollama runs natively on Apple Silicon
+- No cloud accounts or API keys required
+
+---
+
+### M1: Data Layer
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Create database schema | All tables created | schema.sql executes successfully | S |
+| Build inventory seed script | 50+ synthetic vehicles | Data loads, queries return results | M |
+| Build lender rules seed data | 10+ synthetic rules | Rules cover tiers and terms | S |
+| Create ChromaDB collection | Inventory embeddings | Similarity search returns results | M |
+| Implement basic CRUD operations | Repository layer | Unit tests pass for CRUD ops | M |
+
+**Decision: Local-first (SQLite + ChromaDB)**
+- SQLite: Zero config, file-based, perfect for demo
+- ChromaDB: Python-native, no server
+- Fallback: Postgres via Docker if needed
+
+---
+
+### M2: Payment Calculator (Vertical Slice Start)
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Implement payment formula | `calculate_payment()` function | Unit tests verify formula accuracy | S |
+| Implement rule matching | `select_lender_rule()` function | Returns correct rule for FICO/term/LTV | M |
+| Create PaymentResult model | Pydantic model | Includes all audit fields | S |
+| Build `/estimate_payment` endpoint | Working API | Returns correct payment with trace | M |
+| Handle edge cases | Error responses | LTV exceeded, no rule match work | M |
+
+**This is the core vertical slice**: Rule → Calculation → Audit trace
+
+---
+
+### M3: Inventory Search
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Build `/search_inventory` endpoint | Filter-based search | Filters work correctly | M |
+| Build `/vehicle/{id}` endpoint | Single vehicle GET | Returns full vehicle data | S |
+| Implement vector similarity search | `find_similar_vehicles()` | Returns semantically similar vehicles | M |
+| Add search by VIN | `/vehicle/vin/{vin}` | VIN lookup works | S |
+
+---
+
+### M4: LLM Integration
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Create intent classifier | Classify 5 intent types | 90%+ accuracy on test set | M |
+| Build entity extractor | Extract slots (make, price, etc.) | Correct extraction on test cases | M |
+| Implement tool router | Map intents to tool calls | Correct tool selected per intent | M |
+| Create response generator | Natural language responses | Responses are coherent and accurate | M |
+| Add calculation verification | Post-generation check | LLM-stated numbers match calculation | M |
+
+**Decision: Local-first (Ollama)**
+- llama3.2:8b runs well on M4 (8-16GB model)
+- ~30 tokens/second inference speed
+- Fallback: Gemini 1.5 Flash free tier (60 req/min)
+
+---
+
+### M5: Chat UI
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Create chat interface | Message list + input | Messages display correctly | M |
+| Add vehicle cards | Inline vehicle previews | Vehicles render in chat | M |
+| Add payment estimate display | Calculation trace UI | Shows breakdown and rule ID | M |
+| Add session management | Session persistence | Conversation history maintained | S |
+| Style with modern design | Polished appearance | Responsive, clean design | M |
+
+---
+
+### M6: Governance & Polish
+
+| Task | Deliverable | Acceptance Criteria | Complexity |
+|---|---|---|---|
+| Implement audit logging | All requests logged | audit_logs table populated | M |
+| Add disclaimer injection | Auto-append disclaimers | All payment responses have disclaimer | S |
+| Add input validation | Pydantic validation | Invalid inputs rejected with messages | M |
+| Create README with disclaimers | Documentation | Setup instructions + legal disclaimers | S |
+| End-to-end testing | Full flow test | User journey works without errors | L |
+
+---
+
+## 9) Tech Stack Summary
+
+### Chosen Stack (Single Choice, Local-First)
+
+| Layer | Technology | Version | Notes |
+|---|---|---|---|
+| **Frontend** | React + Vite | React 18, Vite 5 | TypeScript preferred |
+| **Backend** | Python + FastAPI | Python 3.11+, FastAPI 0.100+ | Async, modern |
+| **Database** | SQLite | 3.x | File-based, zero config |
+| **Vector Store** | ChromaDB | 0.4+ | Local, Python-native |
+| **LLM** | Ollama + llama3.2 | Latest | M4 optimized |
+| **Embeddings** | nomic-embed-text (Ollama) | Latest | Local embedding |
+| **Validation** | Pydantic | 2.x | FastAPI integration |
+
+### Why This Stack for Mac mini M4 + $0
+
+1. **Performance**: M4's Neural Engine accelerates local LLM inference
+2. **Offline-capable**: No API dependencies, works without internet
+3. **Zero cost**: No API calls, no cloud services
+4. **Fast iteration**: All changes are immediate, no deployment
+5. **Simplicity**: Few moving parts, easy debugging
+
+### Fallback Swaps
+
+| If This Fails... | Switch To... | Trigger |
+|---|---|---|
+| Local LLM too slow | Gemini 1.5 Flash (free) | < 10 tok/s or timeout |
+| ChromaDB issues | FAISS | Dependency conflicts |
+| SQLite limitations | Postgres (Docker) | Need concurrent writes |
+| nomic-embed-text slow | sentence-transformers | Ollama embedding issues |
+| React complexity | Plain HTML + Vanilla JS | UI scope creep |
+
+---
+
+## 10) Risks & Mitigations
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| **Hallucination (APR/rules)** | Medium | Critical | Deterministic calculator; LLM never generates numbers; verification layer compares LLM output to calculated values |
+| **Data gaps (missing inventory attributes)** | Low | Medium | Synthetic data generation allows full control; all required fields populated |
+| **Scope creep** | High | Medium | Explicitly documented out-of-scope list; declined feature requests redirect to "Phase 2" |
+| **Misleading financial estimate** | Medium | High | Mandatory disclaimers; "DEMO ONLY" labels; rule_id citation in every response |
+| **Local hardware limits** | Low | Medium | M4 handles 8B models well; fallback to Gemini free tier; reduce context window if needed |
+| **Free-tier limits (if used)** | Low | Low | Primary stack is local-first; cloud only as fallback |
+| **User trust issues** | Medium | Medium | Calculation trace shows exactly how payment was derived; transparency builds trust |
+| **Stale lender rules** | Low | Low | Rules are synthetic and demo-only; effective/expiration dates in schema for future use |
+
+---
+
+## Next Step Checklist (First 5 Actions)
+
+- [ ] **1. Install Ollama** and pull `llama3.2:8b` and `nomic-embed-text` models
+- [ ] **2. Create project directories** with FastAPI backend and React frontend scaffolds
+- [ ] **3. Write `schema.sql`** with all four tables (inventory, lender_rules, audit_logs, sessions)
+- [ ] **4. Create `seed_data.py`** to generate 50 synthetic vehicles and 10 lender rules
+- [ ] **5. Implement `calculate_payment()`** with unit tests verifying formula accuracy
+
+---
+
+## Definition of Done for Demo MVP
+
+The demo is **DONE** when:
+
+1. ✅ User can ask natural language inventory questions and receive accurate results
+2. ✅ User can request payment estimates and receive calculated payments with APR/term
+3. ✅ Every payment response includes rule_id citation and calculation trace
+4. ✅ System refuses to provide estimates when no matching rule exists
+5. ✅ All responses include demo disclaimers
+6. ✅ Full conversation flow works: inventory search → vehicle selection → payment estimate
+7. ✅ Audit logs capture all requests with calculation traces
+8. ✅ README documents setup, usage, and legal disclaimers
+9. ✅ System runs entirely on Mac mini M4 with no external API costs
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+1. **Unit tests for payment calculator**:
+   ```bash
+   pytest tests/test_calculator.py -v
+   ```
+   - Verify formula accuracy against known calculations
+   - Test edge cases (0% APR, max LTV, term boundaries)
+
+2. **Unit tests for rule matching**:
+   ```bash
+   pytest tests/test_rules.py -v
+   ```
+   - Test FICO range matching
+   - Test LTV limit enforcement
+   - Test no-match scenarios
+
+3. **API integration tests**:
+   ```bash
+   pytest tests/test_api.py -v
+   ```
+   - Test all endpoints return correct structures
+   - Test error responses
+
+### Manual Verification
+
+1. **End-to-end user journey**:
+   - Open chat UI
+   - Ask: "Show me SUVs under $35,000"
+   - Verify results match database
+   - Select a vehicle and ask for payment estimate
+   - Verify calculation trace is shown
+   - Verify disclaimer is present
+
+2. **Edge case testing**:
+   - Ask for non-existent vehicle
+   - Request payment with invalid credit tier
+   - Request term not available in rules
+   - Verify appropriate error messages

@@ -1,0 +1,354 @@
+Mini-Lakebed Demo MVP: Engineering Design Specification and Implementation Plan
+1. Executive Summary and Context
+The "Mini-Lakebed Demo MVP" represents a foundational initiative to architect a centralized control plane for data asset management—a "Lakebed"—that abstracts underlying storage complexities and provides a unified, governed API for registering, discovering, and managing data assets. This document serves as the authoritative implementation plan, rigorously aligned with Google’s internal engineering standards, including the Google API Improvement Proposals (AIPs), Site Reliability Engineering (SRE) principles, and the Google Python Style Guide.
+The proliferation of unmanaged data assets across disparate storage systems often results in a "data swamp," characterized by poor discoverability, inconsistent metadata, and a distinct lack of governance.1 To address this, the Mini-Lakebed system is designed not merely as a passive catalog but as an active control plane that enforces structure through a hierarchical resource model. By adhering to the philosophy that "writing forces clarity of thought" 1, this design document formalizes the architectural decisions, API contracts, and operational strategies necessary to deliver a scalable, secure, and observable system.
+This report is structured to mirror the rigorous "Design Doc" or "RFC" (Request for Comments) format favored by high-performing engineering organizations.1 It moves beyond simple functional requirements to explore the why and how of the system's design, ensuring that every architectural choice—from the specific HTTP verbs used in the API to the granularity of observability metrics—is justified by established engineering best practices. The goal is to produce a "Mini-Lakebed" that is theoretically capable of scaling to enterprise demands, ensuring that the "MVP" label does not become an excuse for technical debt.
+1.1 Objective and Scope
+The primary objective is to define a scalable, secure, and observable architecture for the Mini-Lakebed service. This service will expose a gRPC and RESTful API interface that allows users to manage three primary resources: Lake, Zone, and Asset. The design enforces strict adherence to Resource-Oriented Design (ROD) principles, ensuring long-term maintainability and superior developer ergonomics.4
+Scope Definition:
+The scope of this implementation includes the comprehensive design of the control plane logic, the persistent storage schema for metadata, the API gateway configuration, and the observability instrumentation required for production readiness.
+Table 1: Scope Inclusions and Exclusions
+Feature Area
+In Scope (MVP)
+Out of Scope (Future Work)
+API Surface
+Full CRUD for Lakes, Zones, Assets; Custom verbs for snapshotting.
+GraphQL interfaces; Batch operations (AIP-231).
+Storage
+Metadata persistence in Cloud SQL (PostgreSQL).
+Data plane virtualization (proxying actual file bytes).
+Security
+IAM-based authentication; RBAC at the Resource level.
+Field-level ACLs; Dynamic masking of PII in data.
+Observability
+Implementation of the Four Golden Signals (Latency, Traffic, Errors, Saturation).
+Distributed tracing across multi-cloud boundaries.
+Integrations
+Google Cloud Storage (GCS) for asset validation.
+AWS S3 or Azure Blob Storage federation.
+
+1.2 Target Audience and Usage
+This document is written for a technical audience comprising software engineers, site reliability engineers (SREs), and technical product managers. It assumes familiarity with distributed systems concepts but explains specific Google-standard patterns (like AIPs) where necessary. The "Mini-Lakebed" is intended to be used by data platform teams to provision logical namespaces ("Lakes") for different business units, within which data scientists and engineers can register and discover physical data assets ("Assets") organized into "Zones" (e.g., Raw, Curated, Sandbox).6
+2. System Architecture and Design Principles
+The architecture of the Mini-Lakebed follows a cloud-native, microservices-oriented design pattern, emphasizing separation of concerns, statelessness, and "Zero Trust" security.8 The system is decomposed into a set of distinct layers, each responsible for a specific aspect of the data lifecycle, from request ingestion to persistent storage.
+2.1 Architectural Components
+The system is composed of four primary logical tiers. The API Gateway / Interface Layer serves as the entry point for all traffic. It is responsible for handling incoming gRPC and HTTP/JSON requests, performing protocol transcoding (gRPC to JSON for REST clients), and executing initial request validation. This layer strictly enforces the API contract defined in the Protocol Buffers (.proto) files, ensuring that malformed requests are rejected before reaching the business logic.4
+Beneath the interface layer lies the Application Logic, or the "Lakebed Service." This is a stateless Python service designed for horizontal scalability.9 It implements the core business logic, such as validating state transitions (e.g., ensuring a "Curated" Zone cannot be deleted if it contains active Assets) and orchestrating interactions with the storage layer. By keeping this layer stateless, we allow the system to scale out simply by adding more replicas, a critical requirement for handling traffic spikes.10
+The Storage Layer is dual-pronged. A high-consistency transactional database (Cloud SQL running PostgreSQL) is used to store the resource configurations and state metadata. This ensures strict referential integrity between Lakes, Zones, and Assets. Simultaneously, an Object Storage system (Google Cloud Storage) is utilized to store large schema files, sample data snippets, or logs that are referenced by the Asset resources but are too large or unstructured for the relational store.
+Finally, the Control Plane consists of asynchronous background workers. These workers handle long-running operations (LROs), such as validating the existence of a physical GCS bucket when a new Asset is registered, or calculating storage statistics for a Zone. This separation ensures that the synchronous API remains responsive (low latency) even when processing heavy background tasks.11
+2.2 Design Philosophy: Resource-Oriented Design
+The Mini-Lakebed adopts Resource-Oriented Design (ROD) as its guiding philosophy. In this paradigm, the API is modeled as a hierarchy of individually addressable resources (nouns) rather than a collection of remote procedure calls (verbs).5 This approach aligns with the REST architectural style but provides stricter standardization through the AIP framework.
+Resources are named hierarchically, reflecting their logical containment. A Zone cannot exist outside of a Lake, and an Asset cannot exist outside of a Zone. This hierarchy is encoded directly into the resource names, providing a predictable and intuitive structure for developers.12 For example, the name projects/my-project/locations/us-west1/lakes/finance-lake/zones/raw-zone instantly communicates the resource's type, parentage, and physical location.
+2.3 Security Architecture: Zero Trust
+Security is not an overlay but a foundational element of the architecture. We adopt a Zero Trust security model, which assumes no implicit trust between components, regardless of whether they are "inside" or "outside" the corporate network perimeter.8
+Authentication and Identity:
+Every request to the Mini-Lakebed API must be authenticated. Service-to-service communication (e.g., the API Gateway talking to the Lakebed Service) utilizes Mutual TLS (mTLS) to ensure both encryption in transit and cryptographic identity verification.8 End-user authentication leverages OAuth 2.0 and OpenID Connect (OIDC), with the system validating Identity Assertion Tokens (ID Tokens) at the gateway.
+Authorization and RBAC:
+Authorization is implemented via robust Role-Based Access Control (RBAC). Permissions are checked at the resource level. A user might have roles/lakebed.admin on the finance-lake resource, granting them full control over that lake and all its child zones and assets, while having only roles/lakebed.viewer on the marketing-lake. This granular control is essential for multi-tenant data platforms.13
+Data Protection:
+To protect sensitive metadata, strict encryption standards are enforced. All data at rest within Cloud SQL and GCS is encrypted, preferably using Customer-Managed Encryption Keys (CMEK) to give the customer control over the key lifecycle.8 Data in transit is secured using TLS 1.3, ensuring forward secrecy and resistance to interception.
+3. Detailed API Specification (AIP Compliance)
+The heart of the Mini-Lakebed implementation is its API. To ensure a consistent developer experience and avoid the common pitfalls of ad-hoc API design, we strictly follow the Google API Improvement Proposals (AIPs). These standards dictate everything from resource naming to error handling, ensuring the API is intuitive, consistent, and automatable.4
+3.1 Resource Naming (AIP-122)
+Resource names are the primary identifiers in our system. Following AIP-122, we define a strict pattern for resource names that alternates between collection identifiers and resource IDs.12
+Naming Pattern:
+The full resource name for an asset follows the pattern:
+projects/{project}/locations/{location}/lakes/{lake}/zones/{zone}/assets/{asset}
+Analysis of Naming Decisions:
+Plural Collections: We use plural nouns for collection identifiers (lakes, zones, assets) as mandated by 6 and.7 This creates a natural linguistic flow (GET.../lakes implies retrieving a collection).
+Kebab-Case Segments: URI segments use kebab-case (e.g., feature-store, not FeatureStore or feature_store). This is the standard for URL readability and avoids issues with case-insensitive filesystems or proxies.6
+User-Defined IDs: The {lake}, {zone}, and {asset} segments are user-defined IDs. To ensure these function as valid URI components, we enforce RFC-1034 compliance: they must contain only lowercase letters, numbers, and hyphens.12
+3.2 Standard Methods
+The API implements the standard CRUD methods defined in AIP-131 through AIP-135. These methods provide a predictable behavioral contract for developers.4
+3.2.1 Get Method (AIP-131)
+The Get method retrieves a single resource.
+Contract: The RPC name must be GetLake (Verb + Singular Resource). The HTTP verb must be GET.
+Request: The request message (GetLakeRequest) must contain a single field name representing the resource name.
+Behavior: It returns the fully populated resource. If the resource does not exist, it must return a NOT_FOUND error, not an empty response or a 200 OK with a generic error message.16
+Table 2: GetLake Specification
+
+Component
+Specification
+Rationale
+RPC Name
+GetLake
+Consistent Verb-Noun naming.17
+HTTP Verb
+GET
+Standard REST semantics for retrieval.5
+URL Pattern
+/v1/{name=projects/*/locations/*/lakes/*}
+Maps the resource name directly to the URL path.16
+Required Field
+name
+The unique identifier is mandatory for retrieval.16
+
+3.2.2 List Method (AIP-132) and Pagination (AIP-158)
+The List method retrieves a collection of resources. Crucially, because collections can grow indefinitely, pagination is mandatory.18
+Pagination Mechanism: The request supports page_size (int32) and page_token (string). The response includes next_page_token.
+Opacity: The page_token must be an opaque string (usually a base64 encoded serialized proto). Clients must not attempt to parse it, ensuring the backend implementation (e.g., database cursor) can change without breaking clients.18
+Ordering: The request supports an order_by string field, allowing SQL-like syntax (e.g., create_time desc, display_name). This empowers users to sort data grids efficiently.19
+Filtering: The filter field allows for complex queries (e.g., state = "ACTIVE" AND create_time > "2023-01-01"), following the AIP-160 standard filter syntax.
+3.2.3 Create Method (AIP-133)
+The Create method creates a new resource within a parent collection.
+Separation of ID and Body: Following AIP-133, the user-specified ID (e.g., marketing-lake) is passed as a separate query parameter or field (lake_id), distinct from the resource body. This separation allows the server to validate the ID against naming rules before processing the potentially large resource body.20
+Field Behavior: The resource body in the request creates the initial state. However, "Output Only" fields like create_time or uid are ignored if provided by the client, preventing spoofing.21
+3.2.4 Update Method (AIP-134)
+The Update method modifies an existing resource.
+Partial Updates (Field Masks): To avoid race conditions and accidental overwrites, we mandate the use of a FieldMask (update_mask). The client must explicitly list the fields they intend to update (e.g., update_mask="display_name,description"). The server only updates those specific fields. If a field is missing from the mask, it is ignored, even if present in the request body.4 This is critical for systems where multiple users might be editing different parts of a resource simultaneously.
+3.2.5 Delete Method (AIP-135)
+The Delete method removes a resource.
+Cascading Deletes: By default, deleting a Lake that contains Zones should fail with FAILED_PRECONDITION. This safety mechanism prevents accidental massive data loss. To allow cascading deletes, a force boolean parameter can be added to the request, requiring explicit user intent.22
+3.3 Custom Methods (AIP-136)
+While standard methods cover 90% of use cases, certain business logic requires custom verbs. For Mini-Lakebed, we introduce SnapshotZone to create a point-in-time metadata consistency checkpoint.
+Design: Custom methods use the HTTP POST verb because they typically involve state change or complex processing that doesn't map cleanly to a REST resource update.23
+URI Pattern: The URI uses a colon separator to denote the custom action: /v1/{name=.../zones/*}:snapshot. This clearly distinguishes it from a standard resource path.23
+3.4 Error Handling (AIP-193)
+Robust error handling is essential for a good developer experience. We reject the pattern of returning simple HTTP 400 strings in favor of the structured google.rpc.Status model.22
+Structured Error Details:
+Every error response includes a details array containing google.rpc.ErrorInfo. This provides machine-readable metadata that allows clients to handle errors programmatically without parsing English text.
+Table 3: Standard Error Mappings
+Canonical Code
+HTTP Code
+Meaning
+Example Scenario
+INVALID_ARGUMENT
+400
+Client specified an invalid argument.
+lake_id contains uppercase letters.
+NOT_FOUND
+404
+Resource does not exist.
+Accessing a Lake that was deleted.
+ALREADY_EXISTS
+409
+Resource creation failed.
+Creating a Lake with an ID that is already taken.
+PERMISSION_DENIED
+403
+Client does not have sufficient permission.
+User lacks lakebed.lakes.create permission.
+RESOURCE_EXHAUSTED
+429
+Quota limit reached.
+User has exceeded the limit of 10 API calls/second.
+FAILED_PRECONDITION
+400
+System state prevents operation.
+Deleting a non-empty Lake without force=true.
+
+3.5 Field Behavior and Validation (AIP-203)
+Proto definitions are annotated with google.api.field_behavior to explicitly define how fields should be handled by the server and client.21
+REQUIRED: Denotes fields that must be present in a Create/Update request (e.g., Lake.display_name). Missing these triggers INVALID_ARGUMENT.
+OUTPUT_ONLY: Denotes fields managed by the server (e.g., create_time, state). These are stripped from write requests.
+IMMUTABLE: Denotes fields that cannot be changed after creation (e.g., Zone.location). This is crucial for data integrity; moving a Zone to a different physical location involves complex data migration, which is out of scope for a simple update.21
+INPUT_ONLY: Denotes fields used only during creation, such as initial_admin_user. These are never returned in Get responses, protecting sensitive setup information.21
+4. Data Model and Schema Design
+The data model is the backbone of the Mini-Lakebed service. It must support the hierarchical nature of the resources while ensuring referential integrity and query efficiency.
+4.1 Schema Definition
+We utilize a relational schema hosted in Cloud SQL (PostgreSQL). The choice of a relational database over NoSQL is driven by the need for strict consistency and transactional integrity when managing the relationships between Lakes, Zones, and Assets.
+Lakes Table:
+The lakes table acts as the root of the hierarchy.
+Primary Key: Composite key of (project_id, location, lake_id). This aligns with the resource name structure, making lookups by name efficient.
+Columns:
+uid (UUID, Unique): An internal, immutable identifier. This allows us to support "rename" operations in the future by updating the lake_id while maintaining stable foreign key references via uid.12
+display_name (VARCHAR): Human-readable name.
+create_time, update_time (TIMESTAMP): Audit trails.
+Zones Table:
+The zones table represents logical subdivisions within a lake.
+Foreign Key: lake_uid referencing lakes(uid). This ensures that if a Lake is hard-deleted, the integrity of the Zones is managed (either blocked or cascaded).
+Columns:
+zone_id (VARCHAR): User-defined ID.
+type (ENUM): e.g., RAW, CURATED, SANDBOX. This type is IMMUTABLE as it dictates the underlying storage policies.
+Assets Table:
+The assets table tracks the physical data pointers.
+Foreign Key: zone_uid referencing zones(uid).
+Columns:
+asset_id (VARCHAR): User-defined ID.
+resource_path (VARCHAR): The URI of the physical data (e.g., gs://my-bucket/data/parquet/).
+schema (JSONB): A flexible column to store the schema definition (Avro/Protobuf) of the asset. Using JSONB in PostgreSQL allows us to index and query specific schema fields without rigid table migrations.
+4.2 Consistency and Concurrency
+Strong Consistency: Metadata operations require strong consistency. When a user creates a Zone, a subsequent ListZones call must return it immediately. The relational model with synchronous replication satisfies this.
+Optimistic Locking: To handle concurrent updates (e.g., two users trying to update the description of the same Asset), we implement optimistic locking using an etag field. The etag is returned in the Get response. An Update request must include this etag. If the stored etag does not match the provided one, the server returns ABORTED, forcing the client to re-fetch and retry.22
+5. Implementation Standards: Python Best Practices
+The implementation of the Lakebed Service logic is done in Python, adhering strictly to the Google Python Style Guide.9 This ensures the codebase is maintainable, readable, and consistent with the broader ecosystem of Google engineering.
+5.1 Code Style and Linting
+Pylint Mandate: Compliance with pylint is mandatory, not optional. The CI/CD pipeline is configured to fail builds on any linting error. Warnings should only be suppressed in exceptional cases, and must be accompanied by a specific inline comment explaining the suppression (e.g., # pylint: disable=invalid-name # complying with external API spec).9
+Imports: Imports are strictly ordered: Standard library first, then third-party libraries, then local application imports. Wildcard imports (from module import *) are strictly prohibited as they pollute the namespace and make code hard to trace.26
+5.2 Type Safety and Annotations
+Although Python is dynamically typed, we enforce the use of type annotations for all function signatures. This enables static analysis tools to catch type errors before runtime.27
+Example of Compliant Function Signature:
+
+Python
+
+
+def get_lake(self, name: str) -> Lake:
+    """Retrieves a lake by name.
+
+    Args:
+        name: The resource name of the lake.
+
+    Returns:
+        The Lake resource proto.
+
+    Raises:
+        NotFound: If the lake does not exist.
+    """
+   ...
+
+
+5.3 Exception Handling
+Exceptions are used for error flow control, but they must be precise. We avoid bare except: clauses. Instead, we catch specific exceptions and wrap them in the appropriate google.rpc.Status error codes. For example, a ValueError during ID validation is caught and re-raised as an INVALID_ARGUMENT gRPC error.9
+5.4 Concurrency Model
+The service uses gRPC, which in Python typically relies on a thread pool. To ensure high throughput for I/O-bound operations (like validating a GCS bucket existence), we utilize Python's concurrent.futures or asyncio where appropriate. Global state is strictly avoided in request handlers to ensure thread safety.9
+6. Observability and Reliability Strategy
+Building a reliable service requires deep visibility into its operation. We adopt the SRE Golden Signals—Latency, Traffic, Errors, and Saturation—as the core pillars of our observability strategy.10
+6.1 Latency
+Latency measures how long it takes to service a request. It is critical to distinguish between successful and failed requests, as errors (e.g., 404s) are often very fast and can skew the average latency downwards, masking performance issues in successful requests.29
+Metrics: We track latency histograms (lakebed_request_latency_seconds_bucket) broken down by API method (GetLake, ListAssets).
+Percentiles: We monitor the 50th, 95th, and 99th percentiles. The 99th percentile (p99) is particularly important for identifying the "long tail" of slow requests that affect the worst-case user experience.10
+SLO: We define a Service Level Objective (SLO) that 99% of Get requests should be served in under 200ms.
+6.2 Traffic
+Traffic measures the demand placed on the system.
+Metric: lakebed_requests_total (Counter).
+Usage: This signal is used for capacity planning (autoscaling triggers) and for understanding the relative popularity of different API methods. A sudden drop in traffic can also indicate a problem, such as a network outage upstream.28
+6.3 Errors
+Errors capture the rate of request failures.
+Distinction: We rigorously distinguish between Client Errors (4xx) and Server Errors (5xx). A spike in 4xx errors usually indicates a buggy client or a bad user configuration. A spike in 5xx errors indicates a server-side bug or infrastructure failure (e.g., database down).10
+Alerting: We alert primarily on 5xx errors. Alerting on 4xx errors is generally noisy, unless the rate exceeds a very high threshold (e.g., >10%), which might indicate a botched deployment causing widespread client incompatibility.11
+6.4 Saturation
+Saturation measures how "full" the service is.
+Metrics:
+CPU/Memory: Container utilization.
+Database Connections: The depth of the connection pool. If the pool is consistently exhausted, requests will queue and latency will spike.
+Leading Indicator: Saturation is a leading indicator. While latency alerts tell you when things are bad, saturation alerts tell you when things are about to become bad. We alert at 80% saturation to allow time for automated or manual remediation (scaling).28
+6.5 Logging
+Logs complement metrics by providing context. We adhere to structured JSON logging.
+Trace Context: Every log entry includes trace_id and span_id to allow correlation with distributed traces. This enables an engineer to view a trace in a visualization tool and jump directly to the logs generated by that specific request.13
+Sanitization: Logs are automatically scrubbed of sensitive data (like auth tokens) before being flushed to storage.
+7. Testing Strategy: The Pyramid
+To ensure software quality and maintainability, we adhere to the Testing Pyramid philosophy. This strategy prioritizes a large base of fast, reliable unit tests, supported by a smaller number of integration tests and an even smaller set of end-to-end (E2E) tests.31 This contrasts with the "Ice Cream Cone" anti-pattern, where teams rely heavily on slow, flaky manual or E2E tests.
+Table 4: Testing Pyramid Distribution
+Layer
+Allocation
+Focus
+Speed
+Tools
+Unit Tests
+~70%
+Individual functions, validation logic, regex matching.
+Milliseconds
+pytest, unittest.mock
+Integration
+~20%
+Database interactions, API contract validation, service boundaries.
+Seconds
+testcontainers (PostgreSQL), WebTest
+End-to-End
+~10%
+Full user journeys, critical paths (Provision -> Ingest -> Delete).
+Minutes
+integration environment, live API calls
+
+7.1 Unit Tests
+The base of the pyramid. These tests verify the logic of individual components in isolation.
+Mocking: All external dependencies (Cloud SQL, GCS, IAM) are strictly mocked. This ensures tests are deterministic and run extremely fast.33
+Coverage: We aim for high branch coverage (>90%) in the core business logic.
+Example: A unit test verifies that the Lake name validator correctly rejects names with uppercase letters or invalid characters.
+7.2 Integration Tests
+These tests verify that the components work together correctly.
+Database Testing: We use ephemeral database containers (via testcontainers) to spin up a real PostgreSQL instance for testing. This ensures that our SQL queries are valid and that foreign key constraints function as expected, catching issues that mocks might miss.31
+API Contract: We test the gRPC/HTTP transcoding layer to ensure that JSON requests are correctly deserialized into Proto messages and that response codes map correctly to HTTP status codes.
+7.3 End-to-End (E2E) Tests
+The tip of the pyramid. These tests validate the system from the user's perspective.
+Scenarios: A typical E2E test might simulate a "Golden Path": Create a Lake -> Create a Zone -> Register an Asset -> Verify the Asset appears in the List API -> Delete the Lake.
+Flakiness Management: Flaky E2E tests are a major productivity drain. We implement strict quarantine policies: if an E2E test fails non-deterministically, it is immediately moved to a separate suite and effectively "disabled" until fixed, preventing it from blocking the deployment pipeline.33
+8. Responsible AI and Data Governance Implications
+In the era of Generative AI, a "Lakebed" system is not just a storage utility; it is a governance checkpoint. The metadata managed here dictates what data feeds into AI models, making Responsible AI principles a core design constraint.34
+8.1 Data Provenance and Lineage
+To combat model hallucinations and ensure reproducibility, the system must track data provenance.
+Implementation: The Asset resource includes a lineage field (AIP-203 OUTPUT_ONLY in some contexts, or managed via specific updates). This tracks the source of the data (e.g., "Ingested from SAP ERP on 2023-10-27").
+Impact: This allows AI engineers to trace a model's output back to the specific dataset version that influenced it, a key requirement for AI safety auditing.35
+8.2 Safety Classifiers and Tags
+Users may attempt to register datasets that contain harmful or biased content.
+Metadata Tagging: The Asset resource supports a sensitive_attributes map. This allows data stewards to tag datasets with labels like "Contains PII," "Political Content," or "Health Data."
+Downstream Filtering: ML training pipelines can then query the Mini-Lakebed API to ListAssets filtering out any asset tagged as "High Risk," effectively creating a safety barrier at the infrastructure level.34
+9. Security and Privacy Checklist
+This section serves as a verification checklist to ensure the design meets the rigorous security standards expected of Google-class infrastructure.13
+Table 5: Security Compliance Checklist
+Category
+Requirement
+Implementation Strategy
+Identity
+Verify User Identity
+Enforce OAuth 2.0 / OIDC. Validate ID Tokens at the gateway.
+Access
+Least Privilege
+Implement fine-grained RBAC. Default deny for all resources.
+Data
+Encryption at Rest
+Enable CMEK for Cloud SQL and GCS buckets.
+Network
+Secure Transport
+Enforce TLS 1.3 for all ingress and egress traffic.
+Input
+Sanitization
+Validate all free-text fields (description, display_name) to prevent XSS or prompt injection attacks in downstream tools.
+Audit
+Non-Repudiation
+Log all Create, Update, Delete operations to Cloud Audit Logs with immutable traceability.
+
+10. Alternatives Considered
+A key part of rigorous engineering is exploring the solution space and justifying the chosen path against viable alternatives.37
+10.1 API Protocol: gRPC vs. Pure REST
+Alternative: Use OpenAPI (Swagger) to define a pure REST API.
+Decision: Use gRPC with JSON Transcoding.
+Justification: gRPC offers strict typing via Protocol Buffers, high-performance binary serialization for internal microservices, and automatic backward compatibility checking. By using the google.api.http annotations, we can auto-generate a REST/JSON interface for external clients (web browsers). This gives us the "best of both worlds"—performance for services, accessibility for the web—without maintaining two separate codebases.4 Pure REST lacks the rigorous contract evolution tools of Proto3.
+10.2 Database: Cloud Spanner vs. Cloud SQL
+Alternative: Use Cloud Spanner (Global Relational DB).
+Decision: Use Cloud SQL (PostgreSQL).
+Justification: While Spanner offers unlimited horizontal scale and is the gold standard for Google's own global services, its cost and complexity are overkill for a "Mini-Lakebed" MVP. PostgreSQL offers robust JSONB support (essential for the flexible Asset schema) and sufficient performance for the initial scale. We use an ORM abstraction to allow migration to Spanner in the future if the system needs to scale globally.37
+10.3 Resource IDs: UUIDs vs. User-Defined Names
+Alternative: Use strict UUIDs in URLs (e.g., /lakes/550e8400...).
+Decision: Use User-Defined Names (e.g., /lakes/finance) in URLs, mapped to internal UUIDs.
+Justification: User-defined names are significantly friendlier for humans (developers, data scientists). However, they are mutable (renaming is hard) and can collide. By using an internal immutable uid for foreign keys but exposing the user-friendly name in the API, we align with AIP-122 guidance, balancing usability with referential integrity.12
+11. Conclusion
+This implementation plan moves the "Mini-Lakebed Demo MVP" from a conceptual sketch to a rigorous engineering specification. By anchoring the design in the Google AIP framework, we ensure the API is intuitive, consistent, and durable. By adopting the SRE Golden Signals and the Testing Pyramid, we prioritize reliability and maintainability from the first line of code. This document serves as the "source of truth" for the engineering team, providing a clear roadmap to build a system that is not just a demo, but a solid foundation for a scalable data platform.
+Works cited
+Design Docs, accessed December 22, 2025, https://www.designdocs.dev/
+writing-rfc-resources.md - gist/GitHub, accessed December 22, 2025, https://gist.github.com/henkmeulekamp/117f2ec9c2767500cc9a4460615a998e
+RFC Template - HashiCorp, accessed December 22, 2025, https://www.hashicorp.com/how-hashicorp-works/articles/rfc-template
+API design guide - Google Cloud Documentation, accessed December 22, 2025, https://docs.cloud.google.com/apis/design
+Google API Design Guide, accessed December 22, 2025, https://apistylebook.com/design/guidelines/google-api-design-guide
+Best Practices for Naming REST API Endpoints - DreamFactory Blog, accessed December 22, 2025, https://blog.dreamfactory.com/best-practices-for-naming-rest-api-endpoints
+REST Interface Design | Google Ads API, accessed December 22, 2025, https://developers.google.com/google-ads/api/rest/design/overview
+Google infrastructure security design overview, accessed December 22, 2025, https://docs.cloud.google.com/docs/security/infrastructure/design
+Google Python Style Guide, accessed December 22, 2025, https://google.github.io/styleguide/pyguide.html
+Why You Need to Monitor the Four Golden Signals | New Relic, accessed December 22, 2025, https://newrelic.com/blog/apm/monitoring-golden-signals
+Google SRE monitoring ditributed system - sre golden signals, accessed December 22, 2025, https://sre.google/sre-book/monitoring-distributed-systems/
+AIP-122: Resource names, accessed December 22, 2025, https://google.aip.dev/122
+Security checklists - Google Workspace Admin Help, accessed December 22, 2025, https://support.google.com/a/answer/9184226?hl=en
+Google Workspace Security Checklist: Essential Steps for Admins in 2024 - DoControl, accessed December 22, 2025, https://www.docontrol.io/blog/google-workspace-security-checklist
+Google security overview - Google Cloud Documentation, accessed December 22, 2025, https://docs.cloud.google.com/docs/security/overview/whitepaper
+AIP-131: Standard methods: Get - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/131
+AIP-190: Naming conventions, accessed December 22, 2025, https://google.aip.dev/190
+AIP-158: Pagination - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/158
+AIP-132: Standard methods: List - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/132
+AIP-133: Standard methods: Create - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/133
+AIP-203: Field behavior documentation - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/203
+Errors - CUDO Compute, accessed December 22, 2025, https://www.cudocompute.com/docs/api/errors
+AIP-136: Custom methods - API Improvement Proposals, accessed December 22, 2025, https://google.aip.dev/136
+Handle error responses | Merchant API - Google for Developers, accessed December 22, 2025, https://developers.google.com/merchant/api/guides/error-handling
+Google Python Style Guide, accessed December 22, 2025, https://android.googlesource.com/platform/external/google-styleguide/+/refs/tags/android-s-beta-2/pyguide.md
+Python Style Guide - Google Code, accessed December 22, 2025, https://code.google.com/archive/p/soc/wikis/PythonStyleGuide.wiki
+Google Python Style Guide Rules - Sourcery Documentation, accessed December 22, 2025, https://docs.sourcery.ai/References/Sourcery-Rules/Python/Optional-Rules/gpsg/
+What are golden signals? - Dynatrace, accessed December 22, 2025, https://www.dynatrace.com/knowledge-base/golden-signals/
+4 SRE Golden Signals (What they are and why they matter) - FireHydrant, accessed December 22, 2025, https://firehydrant.com/blog/4-sre-golden-signals-what-they-are-and-why-they-matter/
+What are the 'Golden Signals' that SRE teams use to detect issues? - Cisco DevNet, accessed December 22, 2025, https://developer.cisco.com/articles/what-are-the-golden-signals/what-are-the-golden-signals-that-sre-teams-use-to-detect-issues/
+The Testing Pyramid: A Comprehensive Guide - TestRail, accessed December 22, 2025, https://www.testrail.com/blog/testing-pyramid/
+The Testing Pyramid: How to Structure Your Test Suite - Semaphore CI, accessed December 22, 2025, https://semaphore.io/blog/testing-pyramid
+Just Say No to More End-to-End Tests - Google Testing Blog, accessed December 22, 2025, https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html
+Responsible Generative AI Toolkit - Google AI for Developers, accessed December 22, 2025, https://ai.google.dev/responsible
+Responsible AI | Generative AI on Vertex AI - Google Cloud Documentation, accessed December 22, 2025, https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/responsible-ai
+Security checklist for medium and large businesses (100+ users) - Google Workspace Admin Help, accessed December 22, 2025, https://support.google.com/a/answer/7587183?hl=en
+Writing a good design document | Hacker News, accessed December 22, 2025, https://news.ycombinator.com/item?id=44779428

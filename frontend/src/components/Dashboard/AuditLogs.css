@@ -1,0 +1,87 @@
+.audit-logs-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-bg);
+}
+
+.audit-table th {
+    text-align: left;
+    padding: var(--space-4);
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+    .audit-table th {
+        background: rgba(255, 255, 255, 0.03);
+    }
+}
+
+.audit-table td {
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.audit-table tr:hover {
+    background: rgba(var(--color-primary-h), var(--color-primary-s), 60%, 0.02);
+}
+
+.action-badge {
+    font-size: 0.625rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-muted);
+    color: var(--color-text-muted);
+}
+
+.action-badge.ESTIMATE_PAYMENT {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.action-badge.SEARCH_INVENTORY {
+    background: #f0f9ff;
+    color: #0284c7;
+}
+
+.action-badge.CREATE_LAKE {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-badge.LIST_ASSETS {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.font-mono {
+    font-family: var(--font-mono);
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+.mt-6 {
+    margin-top: var(--space-6);
+}
+
+.btn-secondary {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+}
+
+.btn-secondary:hover {
+    background: var(--color-muted);
+}

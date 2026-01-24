@@ -1,0 +1,202 @@
+[
+  {
+    "id": "scenario_001",
+    "principal": 35000.00,
+    "apr": 5.00,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 660.49
+  },
+  {
+    "id": "scenario_002",
+    "principal": 25000.00,
+    "apr": 6.99,
+    "term": 72,
+    "method": "30/360",
+    "expected_payment": 426.11
+  },
+  {
+    "id": "scenario_003",
+    "principal": 20000.00,
+    "apr": 4.99,
+    "term": 48,
+    "method": "30/360",
+    "expected_payment": 460.50
+  },
+  {
+    "id": "scenario_004",
+    "principal": 30000.00,
+    "apr": 7.99,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 608.15
+  },
+  {
+    "id": "scenario_005",
+    "principal": 15000.00,
+    "apr": 3.99,
+    "term": 36,
+    "method": "30/360",
+    "expected_payment": 442.79
+  },
+  {
+    "id": "scenario_006",
+    "principal": 40000.00,
+    "apr": 5.49,
+    "term": 72,
+    "method": "30/360",
+    "expected_payment": 653.33
+  },
+  {
+    "id": "scenario_007",
+    "principal": 50000.00,
+    "apr": 6.49,
+    "term": 84,
+    "method": "30/360",
+    "expected_payment": 742.23
+  },
+  {
+    "id": "scenario_008",
+    "principal": 10000.00,
+    "apr": 9.99,
+    "term": 36,
+    "method": "30/360",
+    "expected_payment": 322.62
+  },
+  {
+    "id": "scenario_009",
+    "principal": 45000.00,
+    "apr": 4.49,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 838.73
+  },
+  {
+    "id": "scenario_010",
+    "principal": 28000.00,
+    "apr": 5.99,
+    "term": 48,
+    "method": "30/360",
+    "expected_payment": 657.45
+  },
+  {
+    "id": "scenario_011",
+    "principal": 22000.00,
+    "apr": 0.00,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 366.67
+  },
+  {
+    "id": "scenario_012",
+    "principal": 18000.00,
+    "apr": 2.99,
+    "term": 48,
+    "method": "30/360",
+    "expected_payment": 398.34
+  },
+  {
+    "id": "scenario_013",
+    "principal": 55000.00,
+    "apr": 7.49,
+    "term": 72,
+    "method": "30/360",
+    "expected_payment": 950.69
+  },
+  {
+    "id": "scenario_014",
+    "principal": 12000.00,
+    "apr": 8.99,
+    "term": 36,
+    "method": "30/360",
+    "expected_payment": 381.54
+  },
+  {
+    "id": "scenario_015",
+    "principal": 38000.00,
+    "apr": 4.99,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 716.93
+  },
+  {
+    "id": "scenario_016",
+    "principal": 60000.00,
+    "apr": 5.99,
+    "term": 84,
+    "method": "30/360",
+    "expected_payment": 876.23
+  },
+  {
+    "id": "scenario_017",
+    "principal": 8000.00,
+    "apr": 11.99,
+    "term": 24,
+    "method": "30/360",
+    "expected_payment": 376.55
+  },
+  {
+    "id": "scenario_018",
+    "principal": 32000.00,
+    "apr": 6.49,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 625.97
+  },
+  {
+    "id": "scenario_019",
+    "principal": 17000.00,
+    "apr": 4.49,
+    "term": 36,
+    "method": "30/360",
+    "expected_payment": 505.62
+  },
+  {
+    "id": "scenario_020",
+    "principal": 42000.00,
+    "apr": 6.99,
+    "term": 72,
+    "method": "30/360",
+    "expected_payment": 715.86
+  },
+  {
+    "id": "scenario_021",
+    "principal": 26000.00,
+    "apr": 5.49,
+    "term": 48,
+    "method": "30/360",
+    "expected_payment": 604.55
+  },
+  {
+    "id": "scenario_022",
+    "principal": 48000.00,
+    "apr": 7.99,
+    "term": 84,
+    "method": "30/360",
+    "expected_payment": 747.90
+  },
+  {
+    "id": "scenario_023",
+    "principal": 14000.00,
+    "apr": 3.49,
+    "term": 36,
+    "method": "30/360",
+    "expected_payment": 410.17
+  },
+  {
+    "id": "scenario_024",
+    "principal": 36000.00,
+    "apr": 5.99,
+    "term": 60,
+    "method": "30/360",
+    "expected_payment": 695.81
+  },
+  {
+    "id": "scenario_025",
+    "principal": 21000.00,
+    "apr": 8.49,
+    "term": 48,
+    "method": "30/360",
+    "expected_payment": 517.52
+  }
+]

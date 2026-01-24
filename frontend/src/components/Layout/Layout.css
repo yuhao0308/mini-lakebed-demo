@@ -1,0 +1,39 @@
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--color-bg);
+}
+
+.main-container {
+    flex: 1;
+    margin-left: 260px;
+    /* Width of Sidebar */
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* Prevent flex box from expanding beyond viewport */
+}
+
+.content-area {
+    flex: 1;
+    padding: var(--space-8);
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 64px;
+    }
+
+    .sidebar .logo-text,
+    .sidebar .nav-item span,
+    .sidebar .demo-badge {
+        display: none;
+    }
+
+    .main-container {
+        margin-left: 64px;
+    }
+}
