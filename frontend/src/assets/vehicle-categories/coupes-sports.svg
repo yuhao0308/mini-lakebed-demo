@@ -1,0 +1,28 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgSport" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#450A0A"/>
+      <stop offset="1" stop-color="#BE123C"/>
+    </linearGradient>
+    <linearGradient id="roadSport" x1="0" y1="0" x2="0" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827" stop-opacity="0"/>
+      <stop offset="1" stop-color="#111827" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="carSport" x1="320" y1="330" x2="970" y2="540" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FECACA"/>
+      <stop offset="1" stop-color="#FB7185"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bgSport)"/>
+  <circle cx="1030" cy="120" r="130" fill="#FECDD3" fill-opacity="0.2"/>
+  <circle cx="240" cy="170" r="170" fill="#F43F5E" fill-opacity="0.26"/>
+  <rect y="500" width="1280" height="220" fill="url(#roadSport)"/>
+  <path d="M250 500C350 420 470 344 655 344H760C850 344 932 380 1010 456L1040 500V530H250V500Z" fill="url(#carSport)"/>
+  <path d="M470 360H760C810 360 860 378 892 408L922 436H406L448 380C454 372 462 366 470 360Z" fill="#FDA4AF"/>
+  <rect x="492" y="384" width="196" height="44" rx="10" fill="#4C0519" fill-opacity="0.45"/>
+  <rect x="706" y="384" width="150" height="44" rx="10" fill="#4C0519" fill-opacity="0.45"/>
+  <circle cx="430" cy="530" r="64" fill="#111827"/>
+  <circle cx="430" cy="530" r="30" fill="#FB7185"/>
+  <circle cx="870" cy="530" r="64" fill="#111827"/>
+  <circle cx="870" cy="530" r="30" fill="#FB7185"/>
+</svg>

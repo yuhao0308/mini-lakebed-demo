@@ -1,0 +1,28 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgSuv" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#052E16"/>
+      <stop offset="1" stop-color="#166534"/>
+    </linearGradient>
+    <linearGradient id="roadSuv" x1="0" y1="0" x2="0" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#022C22" stop-opacity="0"/>
+      <stop offset="1" stop-color="#022C22" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="carSuv" x1="300" y1="320" x2="1020" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D1FAE5"/>
+      <stop offset="1" stop-color="#6EE7B7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bgSuv)"/>
+  <circle cx="1060" cy="140" r="140" fill="#BBF7D0" fill-opacity="0.18"/>
+  <circle cx="240" cy="190" r="180" fill="#34D399" fill-opacity="0.2"/>
+  <rect y="500" width="1280" height="220" fill="url(#roadSuv)"/>
+  <path d="M210 470C280 385 386 320 564 320H804C896 320 980 362 1055 440L1090 476V530H210V470Z" fill="url(#carSuv)"/>
+  <path d="M415 350H820C868 350 910 372 940 412L954 430H362L380 390C389 368 401 350 415 350Z" fill="#A7F3D0"/>
+  <rect x="410" y="378" width="210" height="52" rx="10" fill="#064E3B" fill-opacity="0.45"/>
+  <rect x="640" y="378" width="220" height="52" rx="10" fill="#064E3B" fill-opacity="0.45"/>
+  <circle cx="390" cy="530" r="66" fill="#052E16"/>
+  <circle cx="390" cy="530" r="32" fill="#86EFAC"/>
+  <circle cx="900" cy="530" r="66" fill="#052E16"/>
+  <circle cx="900" cy="530" r="32" fill="#86EFAC"/>
+</svg>

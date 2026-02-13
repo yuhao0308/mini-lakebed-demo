@@ -1,0 +1,28 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgTruck" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#451A03"/>
+      <stop offset="1" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="roadTruck" x1="0" y1="0" x2="0" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C1917" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1C1917" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="carTruck" x1="200" y1="320" x2="1050" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FED7AA"/>
+      <stop offset="1" stop-color="#FDBA74"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bgTruck)"/>
+  <circle cx="1030" cy="140" r="140" fill="#FDE68A" fill-opacity="0.2"/>
+  <circle cx="260" cy="160" r="170" fill="#F59E0B" fill-opacity="0.22"/>
+  <rect y="500" width="1280" height="220" fill="url(#roadTruck)"/>
+  <rect x="220" y="370" width="350" height="150" rx="18" fill="#FCD34D"/>
+  <path d="M540 520V384C540 348 568 320 604 320H822C870 320 920 340 958 376L1046 458V520H540Z" fill="url(#carTruck)"/>
+  <rect x="622" y="370" width="170" height="58" rx="10" fill="#7C2D12" fill-opacity="0.4"/>
+  <rect x="806" y="370" width="132" height="58" rx="10" fill="#7C2D12" fill-opacity="0.4"/>
+  <circle cx="420" cy="530" r="68" fill="#292524"/>
+  <circle cx="420" cy="530" r="32" fill="#FDBA74"/>
+  <circle cx="890" cy="530" r="68" fill="#292524"/>
+  <circle cx="890" cy="530" r="32" fill="#FDBA74"/>
+</svg>

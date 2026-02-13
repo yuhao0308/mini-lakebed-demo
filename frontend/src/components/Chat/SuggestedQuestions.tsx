@@ -1,5 +1,11 @@
 import React, { useState } from 'react'
 import { Info } from 'lucide-react'
+import sedanImage from '../../assets/vehicle-categories/sedans.svg'
+import suvImage from '../../assets/vehicle-categories/suvs.svg'
+import truckImage from '../../assets/vehicle-categories/trucks.svg'
+import sportImage from '../../assets/vehicle-categories/coupes-sports.svg'
+import vanImage from '../../assets/vehicle-categories/vans-minivans.svg'
+import evImage from '../../assets/vehicle-categories/electric-hybrid.svg'
 import './SuggestedQuestions.css'
 
 export interface Suggestion {
@@ -13,9 +19,11 @@ export interface Suggestion {
 export type VehicleCategory = {
     id: string
     name: string
-    icon: string
+    image: string
+    segment: string
     gradient: 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'
     description: string
+    highlights: [string, string]
     queryTemplate: string
 }
 
@@ -71,49 +79,61 @@ export const VEHICLE_CATEGORIES: VehicleCategory[] = [
     {
         id: 'sedans',
         name: 'Sedans',
-        icon: '🚙',
+        image: sedanImage,
+        segment: 'Daily Commute',
         gradient: 'blue',
-        description: 'Comfortable daily drivers with great value.',
+        description: 'Balanced comfort and operating cost for everyday drivers.',
+        highlights: ['High demand', 'Low running cost'],
         queryTemplate: 'Show me sedans'
     },
     {
         id: 'suvs',
         name: 'SUVs',
-        icon: '🚗',
+        image: suvImage,
+        segment: 'Family Utility',
         gradient: 'green',
-        description: 'Roomy family options with versatile cargo space.',
+        description: 'Flexible interior space and popular trims for growing households.',
+        highlights: ['Top resale value', '3rd-row options'],
         queryTemplate: 'Show me SUVs'
     },
     {
         id: 'trucks',
         name: 'Trucks',
-        icon: '🛻',
+        image: truckImage,
+        segment: 'Work Ready',
         gradient: 'amber',
-        description: 'Built for towing, hauling, and heavy-duty work.',
+        description: 'Serious towing and payload capability for business and personal use.',
+        highlights: ['Tow package', 'Crew cab availability'],
         queryTemplate: 'Show me trucks'
     },
     {
         id: 'coupes-sports',
         name: 'Coupes & Sports',
-        icon: '🏎️',
+        image: sportImage,
+        segment: 'Performance',
         gradient: 'red',
-        description: 'Performance-focused picks with bold styling.',
+        description: 'Style-driven performance choices for premium buyer intent.',
+        highlights: ['Turbo trims', 'Premium package'],
         queryTemplate: 'Show me coupes and sports cars'
     },
     {
         id: 'vans-minivans',
         name: 'Vans & Minivans',
-        icon: '🚐',
+        image: vanImage,
+        segment: 'People Mover',
         gradient: 'purple',
-        description: 'Flexible seating and storage for bigger groups.',
+        description: 'Maximum seating and cargo flexibility for families and fleets.',
+        highlights: ['Large cargo', 'Multi-seat options'],
         queryTemplate: 'Show me vans and minivans'
     },
     {
         id: 'electric-hybrid',
         name: 'Electric & Hybrid',
-        icon: '🔋',
+        image: evImage,
+        segment: 'Efficiency',
         gradient: 'teal',
-        description: 'Fuel-saving and all-electric options for modern driving.',
+        description: 'Lower fuel costs with modern tech and cleaner mobility options.',
+        highlights: ['EV incentives', 'Fast-charge capable'],
         queryTemplate: 'Show me electric and hybrid vehicles'
     }
 ]
@@ -184,7 +204,7 @@ interface FilterBarProps {
 const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, onDismiss }) => {
     return (
         <div className="filter-bar">
-            <div className="filter-select-wrapper">
+            <div className={`filter-select-wrapper ${filters.price ? 'active' : ''}`}>
                 <select
                     className={`filter-dropdown ${filters.price ? 'filter-active' : ''}`}
                     value={filters.price}
@@ -198,7 +218,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, onDismis
                     ))}
                 </select>
             </div>
-            <div className="filter-select-wrapper">
+            <div className={`filter-select-wrapper ${filters.year ? 'active' : ''}`}>
                 <select
                     className={`filter-dropdown ${filters.year ? 'filter-active' : ''}`}
                     value={filters.year}
@@ -212,7 +232,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, onDismis
                     ))}
                 </select>
             </div>
-            <div className="filter-select-wrapper">
+            <div className={`filter-select-wrapper ${filters.brand ? 'active' : ''}`}>
                 <select
                     className={`filter-dropdown ${filters.brand ? 'filter-active' : ''}`}
                     value={filters.brand}
@@ -226,7 +246,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, onDismis
                     ))}
                 </select>
             </div>
-            <div className="filter-select-wrapper">
+            <div className={`filter-select-wrapper ${filters.mileage ? 'active' : ''}`}>
                 <select
                     className={`filter-dropdown ${filters.mileage ? 'filter-active' : ''}`}
                     value={filters.mileage}
@@ -318,8 +338,8 @@ const WelcomeExplorer: React.FC<WelcomeExplorerProps> = ({
     return (
         <div className="welcome-explorer">
             <div className="welcome-explorer-header">
-                <div className="welcome-explorer-title">Explore by vehicle type</div>
-                <div className="welcome-explorer-subtitle">Pick a category to start, then refine with quick filters.</div>
+                <div className="welcome-explorer-title">Vehicle Discovery Workspace</div>
+                <div className="welcome-explorer-subtitle">Start with a market segment, then tighten inventory by budget, year, brand, and mileage.</div>
             </div>
 
             <div className="category-grid">
@@ -330,9 +350,35 @@ const WelcomeExplorer: React.FC<WelcomeExplorerProps> = ({
                         style={{ animationDelay: `${index * 60}ms` }}
                         onClick={() => handleCategoryClick(category)}
                     >
-                        <span className="category-icon">{category.icon}</span>
-                        <span className="category-name">{category.name}</span>
-                        <span className="category-description">{category.description}</span>
+                        <div className="category-media">
+                            <img
+                                className="category-media-image"
+                                src={category.image}
+                                alt={`${category.name} vehicle category`}
+                                loading="lazy"
+                            />
+                            <div className="category-media-overlay" />
+                            <div className="category-media-meta">
+                                <span className={`category-segment segment-${category.gradient}`}>{category.segment}</span>
+                                {activeCategory?.id === category.id && (
+                                    <span className="category-selected-badge">Selected</span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="category-content">
+                            <div className="category-name-row">
+                                <span className="category-name">{category.name}</span>
+                                <span className="category-action">{activeCategory?.id === category.id ? 'Refine Filters' : 'Explore'}</span>
+                            </div>
+                            <span className="category-description">{category.description}</span>
+                            <div className="category-highlights">
+                                {category.highlights.map(highlight => (
+                                    <span key={`${category.id}-${highlight}`} className="category-highlight-chip">
+                                        {highlight}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
                     </button>
                 ))}
             </div>

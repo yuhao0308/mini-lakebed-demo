@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import MessageBubble from './MessageBubble'
-import ChatInput from './ChatInput'
+import ChatInput, { type ComposerChip } from './ChatInput'
 import SoftPullCard from '../Consent/SoftPullCard'
 import SuggestedQuestions from './SuggestedQuestions'
 import { composeQuery } from './SuggestedQuestions'
 import type { FilterValues, Suggestion, VehicleCategory } from './SuggestedQuestions'
+import type { Vehicle } from '../../types'
 import { apiService } from '../../services/api'
 import './ChatPane.css'
 
@@ -56,6 +57,10 @@ const AFTER_PAYMENT: Suggestion[] = [
     { icon: '✅', text: 'Can I get approved?', tooltip: 'Runs a soft credit check that won\'t affect your credit score. Requires FCRA consent first.' },
 ]
 
+const MAX_COMPOSER_VEHICLES = 3
+const SINGLE_AUTO_PROMPT = 'Tell me about this vehicle'
+const MULTI_AUTO_PROMPT = 'Compare these vehicles'
+
 const createEmptyFilters = (): FilterValues => ({
     price: '',
     year: '',
@@ -105,6 +110,7 @@ const ChatPane: React.FC = () => {
     ])
     const [loading, setLoading] = useState(false)
     const [inputValue, setInputValue] = useState('')
+    const [composerVehicles, setComposerVehicles] = useState<Vehicle[]>([])
     const [selectedCategory, setSelectedCategory] = useState<VehicleCategory | null>(null)
     const [filters, setFilters] = useState<FilterValues>(createEmptyFilters())
     const [consentState, setConsentState] = useState<ConsentState>({
@@ -124,6 +130,21 @@ const ChatPane: React.FC = () => {
         scrollToBottom()
     }, [messages])
 
+    const isAutoPrompt = (text: string): boolean => (
+        text === SINGLE_AUTO_PROMPT || text === MULTI_AUTO_PROMPT
+    )
+
+    const getAutoPrompt = (vehicleCount: number): string => (
+        vehicleCount > 1 ? MULTI_AUTO_PROMPT : SINGLE_AUTO_PROMPT
+    )
+
+    const focusComposerInput = () => {
+        setTimeout(() => {
+            const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="chat-input"]')
+            textarea?.focus()
+        }, 0)
+    }
+
     const handleSendMessage = async (content: string) => {
         const userMsg: Message = {
             role: 'user',
@@ -133,6 +154,7 @@ const ChatPane: React.FC = () => {
 
         setMessages(prev => [...prev, userMsg])
         setInputValue('')
+        setComposerVehicles([])
         setSelectedCategory(null)
         setFilters(createEmptyFilters())
         setLoading(true)
@@ -216,10 +238,102 @@ const ChatPane: React.FC = () => {
 
     const handleSuggestionSelect = (text: string) => {
         setInputValue(text)
-        setTimeout(() => {
-            const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="chat-input"]')
-            textarea?.focus()
-        }, 0)
+        focusComposerInput()
+    }
+
+    const handleToggleVehicleComposerSelection = (vehicle: Vehicle) => {
+        if (loading || consentState.required) {
+            return
+        }
+
+        setComposerVehicles(prev => {
+            const exists = prev.some(item => item.id === vehicle.id)
+            let next: Vehicle[]
+
+            if (exists) {
+                next = prev.filter(item => item.id !== vehicle.id)
+            } else if (prev.length >= MAX_COMPOSER_VEHICLES) {
+                next = [...prev.slice(1), vehicle]
+            } else {
+                next = [...prev, vehicle]
+            }
+
+            setInputValue(current => {
+                if (next.length === 0) {
+                    return isAutoPrompt(current) ? '' : current
+                }
+
+                if (!current.trim() || isAutoPrompt(current)) {
+                    return getAutoPrompt(next.length)
+                }
+
+                return current
+            })
+
+            return next
+        })
+
+        focusComposerInput()
+    }
+
+    const handleRemoveComposerVehicle = (vehicleId: number) => {
+        setComposerVehicles(prev => {
+            const next = prev.filter(item => item.id !== vehicleId)
+            setInputValue(current => {
+                if (next.length === 0) {
+                    return isAutoPrompt(current) ? '' : current
+                }
+
+                if (isAutoPrompt(current)) {
+                    return getAutoPrompt(next.length)
+                }
+
+                return current
+            })
+            return next
+        })
+
+        focusComposerInput()
+    }
+
+    const buildComposerMessage = (draftText: string): string => {
+        const baseText = draftText.trim()
+        if (composerVehicles.length === 0) {
+            return baseText
+        }
+
+        const selectedReferences = composerVehicles
+            .map((vehicle, idx) => {
+                const trimPart = vehicle.trim ? ` ${vehicle.trim}` : ''
+                return `${idx + 1}) vehicle ID ${vehicle.id} (${vehicle.year} ${vehicle.make} ${vehicle.model}${trimPart})`
+            })
+            .join('; ')
+
+        const promptText = baseText || getAutoPrompt(composerVehicles.length)
+        return `${promptText}\nSelected vehicles: ${selectedReferences}`
+    }
+
+    const handleComposerSend = (draftText: string) => {
+        const composedMessage = buildComposerMessage(draftText)
+        if (!composedMessage.trim()) {
+            return
+        }
+
+        void handleSendMessage(composedMessage)
+    }
+
+    const handleRequestVehicleDetails = (vehicle: Vehicle, position?: number) => {
+        if (loading || consentState.required) {
+            return
+        }
+
+        const trimPart = vehicle.trim ? ` ${vehicle.trim}` : ''
+        const vehicleLabel = `${vehicle.year} ${vehicle.make} ${vehicle.model}${trimPart}`
+        const prompt = position
+            ? `Tell me about #${position} (${vehicleLabel}, vehicle ID ${vehicle.id}) with full details.`
+            : `Show full details for vehicle ID ${vehicle.id} (${vehicleLabel}).`
+
+        void handleSendMessage(prompt)
     }
 
     const handleCategorySelect = (category: VehicleCategory) => {
@@ -250,7 +364,15 @@ const ChatPane: React.FC = () => {
         <div className="chat-pane" data-testid="chat-pane">
             <div className="chat-messages" data-testid="chat-messages">
                 {messages.map((msg, idx) => (
-                    <MessageBubble key={idx} message={msg} index={idx} />
+                    <MessageBubble
+                        key={idx}
+                        message={msg}
+                        index={idx}
+                        onRequestVehicleDetails={handleRequestVehicleDetails}
+                        onToggleVehicleComposerSelection={handleToggleVehicleComposerSelection}
+                        selectedComposerVehicleIds={composerVehicles.map(vehicle => vehicle.id)}
+                        actionsDisabled={loading || consentState.required}
+                    />
                 ))}
 
                 {suggestionData?.variant === 'welcome' && (
@@ -295,11 +417,24 @@ const ChatPane: React.FC = () => {
             )}
 
             <div className="chat-footer">
+                {composerVehicles.length > 0 && (
+                    <div className="composer-selection-meta">
+                        {composerVehicles.length}/{MAX_COMPOSER_VEHICLES} vehicles selected
+                    </div>
+                )}
                 <ChatInput
-                    onSend={handleSendMessage}
+                    onSend={handleComposerSend}
                     disabled={loading || consentState.required}
                     value={inputValue}
                     onChange={setInputValue}
+                    chips={composerVehicles.map((vehicle): ComposerChip => {
+                        const trimPart = vehicle.trim ? ` ${vehicle.trim}` : ''
+                        return {
+                            id: vehicle.id,
+                            label: `${vehicle.year} ${vehicle.make} ${vehicle.model}${trimPart} • ID ${vehicle.id}`
+                        }
+                    })}
+                    onRemoveChip={handleRemoveComposerVehicle}
                 />
             </div>
         </div>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { User, Bot, Database } from 'lucide-react'
@@ -8,6 +8,7 @@ import OfferingPrice from '../Common/OfferingPrice'
 import PaymentBreakdown from '../Deal/PaymentBreakdown'
 import AdverseActionPDF from '../PDF/AdverseActionPDF'
 import CancellationOption from '../Disclosure/CancellationOption'
+import type { Vehicle } from '../../types'
 import './MessageBubble.css'
 
 interface Message {
@@ -19,11 +20,27 @@ interface Message {
 
 interface MessageBubbleProps {
     message: Message
+    onRequestVehicleDetails?: (vehicle: Vehicle, position?: number) => void
+    onToggleVehicleComposerSelection?: (vehicle: Vehicle) => void
+    selectedComposerVehicleIds?: number[]
+    actionsDisabled?: boolean
     index?: number
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, index }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+    message,
+    onRequestVehicleDetails,
+    onToggleVehicleComposerSelection,
+    selectedComposerVehicleIds = [],
+    actionsDisabled = false,
+    index
+}) => {
     const isAssistant = message.role === 'assistant'
+    const [flippedCardKey, setFlippedCardKey] = useState<string | null>(null)
+
+    const handleToggleFlip = (vehicleKey: string) => {
+        setFlippedCardKey(prev => (prev === vehicleKey ? null : vehicleKey))
+    }
 
     return (
         <div
@@ -50,7 +67,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, index }) => {
                                 return (
                                     <div key={idx} className="horizontal-scroll" data-testid="inventory-results">
                                         {call.results.vehicles.map((v: any, vIdx: number) => (
-                                            <InventoryCard key={v.id} vehicle={v} index={vIdx} />
+                                            <InventoryCard
+                                                key={v.id}
+                                                vehicle={v}
+                                                index={vIdx}
+                                                isFlipped={flippedCardKey === `${idx}-${v.id}`}
+                                                onToggleFlip={() => handleToggleFlip(`${idx}-${v.id}`)}
+                                                onRequestDetails={onRequestVehicleDetails}
+                                                onToggleComposerSelection={onToggleVehicleComposerSelection}
+                                                isComposerSelected={selectedComposerVehicleIds.includes(v.id)}
+                                                actionsDisabled={actionsDisabled}
+                                            />
                                         ))}
                                     </div>
                                 )
