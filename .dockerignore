@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.DS_Store
+*.md
+*.docx
+*.pdf
+*.txt
+venv
+__pycache__
+backend
+.env
+.env.*
