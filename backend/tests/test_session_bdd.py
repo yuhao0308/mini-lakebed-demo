@@ -159,11 +159,27 @@ def receive_results(session_context, count, sample_vehicles, event_loop):
 # When Steps
 # ============================================================
 
+def _resolve_reference_if_present(session_context, text, event_loop):
+    """Resolve vehicle references in a message and persist current vehicle."""
+    vehicle = event_loop.run_until_complete(
+        resolve_vehicle_reference(session_context["session_id"], text)
+    )
+    if vehicle:
+        session_context["current_vehicle"] = vehicle
+        event_loop.run_until_complete(
+            update_current_vehicle(session_context["session_id"], vehicle)
+        )
+
+
 @when(parsers.parse('I ask "{question}"'))
+def ask_question(session_context, question, event_loop):
+    # Simulate intent parsing by resolving any vehicle reference in the message.
+    _resolve_reference_if_present(session_context, question, event_loop)
+
+
 @when(parsers.parse('I ask about "{reference}"'))
-def ask_question(session_context, event_loop):
-    # This is handled by context - real implementation would parse intent
-    pass
+def ask_about_reference_phrase(session_context, reference, event_loop):
+    _resolve_reference_if_present(session_context, reference, event_loop)
 
 
 @when(parsers.parse('I ask for a payment without providing credit info'))

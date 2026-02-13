@@ -24,12 +24,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
                 </div>
             </div>
 
-            <nav className="sidebar-nav">
+            <nav className="sidebar-nav" data-testid="sidebar-nav">
                 {menuItems.map((item) => (
                     <button
                         key={item.id}
                         className={`nav-item ${activeView === item.id ? 'active' : ''}`}
                         onClick={() => onViewChange(item.id)}
+                        data-testid={`nav-${item.id}`}
                     >
                         <item.icon size={20} />
                         <span>{item.label}</span>

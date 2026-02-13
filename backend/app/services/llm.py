@@ -2,14 +2,22 @@
 LLM Service for intent classification and entity extraction.
 
 Uses Ollama with llama3.2 for local inference.
+
+T05: Added PII scrubbing for context passed to LLM.
 """
 
 import httpx
 import json
 import re
+import os
+import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
+
+from app.middleware.pii_scrubber import get_pii_scrubber, ScrubbingResult
+
+logger = logging.getLogger(__name__)
 
 
 class Intent(str, Enum):
@@ -97,6 +105,9 @@ async def classify_intent(user_message: str) -> LLMResult:
     """
     Use Ollama to classify intent and extract entities from user message.
     """
+    if os.getenv("DEMO_FORCE_FALLBACK") == "1":
+        return _fallback_classification(user_message)
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -141,7 +152,10 @@ async def classify_intent(user_message: str) -> LLMResult:
                 fico_estimate=_safe_int(entities_dict.get("fico_estimate")),
                 term_months=_safe_int(entities_dict.get("term_months"))
             )
-            
+
+            # Normalize price range: LLM might return min > max if user said "between $35k and $20k"
+            _normalize_price_range(entities)
+
             return LLMResult(
                 intent=intent,
                 entities=entities,
@@ -312,10 +326,11 @@ def _extract_inventory_entities(message: str) -> ExtractedEntities:
         message_lower
     )
     if between_match:
-        min_price = _parse_price_with_suffix(between_match.group(1), between_match.group(2))
-        max_price = _parse_price_with_suffix(between_match.group(3), between_match.group(4))
-        entities.min_price = min_price
-        entities.max_price = max_price
+        price1 = _parse_price_with_suffix(between_match.group(1), between_match.group(2))
+        price2 = _parse_price_with_suffix(between_match.group(3), between_match.group(4))
+        # Normalize: ensure min <= max (user may say "between $35k and $20k")
+        entities.min_price = min(price1, price2)
+        entities.max_price = max(price1, price2)
     else:
         # Pattern 2: "$X-$Y" or "$Xk-$Yk" range format (e.g., "$20,000-$30,000" or "$20k-$30k")
         range_match = re.search(
@@ -323,10 +338,11 @@ def _extract_inventory_entities(message: str) -> ExtractedEntities:
             message_lower
         )
         if range_match:
-            min_price = _parse_price_with_suffix(range_match.group(1), range_match.group(2))
-            max_price = _parse_price_with_suffix(range_match.group(3), range_match.group(4))
-            entities.min_price = min_price
-            entities.max_price = max_price
+            price1 = _parse_price_with_suffix(range_match.group(1), range_match.group(2))
+            price2 = _parse_price_with_suffix(range_match.group(3), range_match.group(4))
+            # Normalize: ensure min <= max
+            entities.min_price = min(price1, price2)
+            entities.max_price = max(price1, price2)
         else:
             # Pattern 3: "under $X" or "less than $X" or "below $X"
             under_match = re.search(
@@ -335,7 +351,7 @@ def _extract_inventory_entities(message: str) -> ExtractedEntities:
             )
             if under_match:
                 entities.max_price = _parse_price_with_suffix(under_match.group(1), under_match.group(2))
-            
+
             # Pattern 4: "over $X" or "more than $X" or "above $X"
             over_match = re.search(
                 r'(?:over|more than|above|at least|min|minimum|starting at)\s*\$?([\d,]+)\s*(k|thousand)?',
@@ -379,7 +395,10 @@ def _extract_inventory_entities(message: str) -> ExtractedEntities:
                 model_normalized = model.title()
             entities.model = model_normalized
             break
-    
+
+    # Final safety check: normalize price range
+    _normalize_price_range(entities)
+
     return entities
 
 
@@ -408,25 +427,37 @@ def _parse_price_with_suffix(price_str: str, suffix: Optional[str]) -> float:
 
 
 def _extract_payment_entities(message: str) -> ExtractedEntities:
-    """Extract payment-related entities using regex patterns."""
-    entities = ExtractedEntities()
+    """Extract payment-related entities using regex patterns.
+
+    Also extracts vehicle references and inventory entities since payment
+    queries often include vehicle context like "first car" or "2020 Ford Bronco".
+    """
+    # Start with inventory entities (make, model, year, body_style)
+    entities = _extract_inventory_entities(message)
     message_lower = message.lower()
-    
-    # Down payment
-    down_match = re.search(r'\$?([\d,]+)\s*k?\s*down', message_lower)
+
+    # Also check for vehicle references like "first car", "#3", "that one"
+    vehicle_ref = _extract_vehicle_reference(message)
+    if vehicle_ref:
+        entities.vehicle_reference = vehicle_ref
+
+    # Down payment - improved pattern to handle "$5,000 down" and "$5k down"
+    down_match = re.search(r'\$?([\d,]+)\s*(k|thousand)?\s*down', message_lower)
     if down_match:
         down = float(down_match.group(1).replace(",", ""))
-        if "k" in message_lower[down_match.end()-5:down_match.end()]:
+        if down_match.group(2) and down_match.group(2).lower() in ("k", "thousand"):
+            down *= 1000
+        elif down < 100:  # Assume thousands if small number
             down *= 1000
         entities.down_payment = down
-    
+
     # Credit/FICO
     fico_match = re.search(r'(\d{3})\s*(credit|fico|score)?', message_lower)
     if fico_match:
         fico = int(fico_match.group(1))
         if 300 <= fico <= 850:
             entities.fico_estimate = fico
-    
+
     # Credit tier keywords
     if "excellent" in message_lower or "super" in message_lower:
         entities.credit_tier = "super_prime"
@@ -436,12 +467,12 @@ def _extract_payment_entities(message: str) -> ExtractedEntities:
         entities.credit_tier = "near_prime"
     elif "poor" in message_lower or "bad" in message_lower:
         entities.credit_tier = "subprime"
-    
+
     # Term months
     term_match = re.search(r'(\d{2})\s*month', message_lower)
     if term_match:
         entities.term_months = int(term_match.group(1))
-    
+
     return entities
 
 
@@ -461,3 +492,41 @@ def _safe_float(val: Any) -> Optional[float]:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _normalize_price_range(entities: ExtractedEntities) -> None:
+    """
+    Normalize price range: ensure min_price <= max_price.
+
+    Users may say "between $35,000 and $20,000" (reversed order).
+    This swaps the values if min > max.
+
+    Modifies entities in-place.
+    """
+    if entities.min_price is not None and entities.max_price is not None:
+        if entities.min_price > entities.max_price:
+            entities.min_price, entities.max_price = entities.max_price, entities.min_price
+
+
+def scrub_context_for_llm(data: Dict[str, Any]) -> ScrubbingResult:
+    """
+    T05: Scrub PII from any context data before passing to LLM.
+
+    Per spec §5.3: All data passed to LLM must go through PII scrubber.
+    Always uses LOW clearance to ensure maximum protection.
+
+    Args:
+        data: Context data to scrub (vehicle info, customer data, etc.)
+
+    Returns:
+        ScrubbingResult with scrubbed_data and audit info
+    """
+    scrubber = get_pii_scrubber()
+    result = scrubber.scrub_for_llm_context(data)
+
+    if result.scrubbing_applied:
+        logger.info(
+            f"PII scrubbed from LLM context: {len(result.fields_scrubbed)} fields masked"
+        )
+
+    return result

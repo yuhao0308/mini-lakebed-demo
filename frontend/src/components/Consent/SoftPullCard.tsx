@@ -30,7 +30,7 @@ const SoftPullCard: React.FC<SoftPullCardProps> = ({
   };
 
   return (
-    <div className="soft-pull-card">
+    <div className="soft-pull-card" data-testid="soft-pull-card">
       <div className="soft-pull-header">
         <span className="soft-pull-icon">🔒</span>
         <h3>Credit Pre-Qualification</h3>

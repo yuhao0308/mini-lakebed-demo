@@ -4,7 +4,7 @@ Deal Jacket Pydantic models.
 Per 03_implementation_dummy_data_plan.md §1.3 DealJacket
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -159,8 +159,7 @@ class DealJacket(BaseModel):
             self.sb766_offering_price = self.selling_price
         return self
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DealCreate(BaseModel):

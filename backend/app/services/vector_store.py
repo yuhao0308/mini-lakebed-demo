@@ -5,6 +5,7 @@ Uses ChromaDB with sentence-transformers for local embeddings.
 This enables "find similar vehicles" functionality.
 """
 
+import asyncio
 import chromadb
 from chromadb.utils import embedding_functions
 from typing import List, Dict, Any, Optional
@@ -114,7 +115,7 @@ async def index_vehicles(vehicles: List[Dict[str, Any]]) -> int:
     return len(documents)
 
 
-async def find_similar_vehicles(
+def _find_similar_vehicles_sync(
     query_vehicle: Dict[str, Any],
     n_results: int = 5,
     exclude_id: Optional[int] = None
@@ -177,7 +178,26 @@ async def find_similar_vehicles(
     return similar_vehicles
 
 
-async def find_similar_by_text(
+async def find_similar_vehicles(
+    query_vehicle: Dict[str, Any],
+    n_results: int = 5,
+    exclude_id: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    """
+    Async wrapper that offloads blocking vector search to a thread.
+
+    ChromaDB query calls invoke a synchronous embedding function and can
+    block the event loop if run inline.
+    """
+    return await asyncio.to_thread(
+        _find_similar_vehicles_sync,
+        query_vehicle,
+        n_results,
+        exclude_id
+    )
+
+
+def _find_similar_by_text_sync(
     query_text: str,
     n_results: int = 5
 ) -> List[Dict[str, Any]]:
@@ -216,13 +236,26 @@ async def find_similar_by_text(
     return vehicles
 
 
+async def find_similar_by_text(
+    query_text: str,
+    n_results: int = 5
+) -> List[Dict[str, Any]]:
+    """Async wrapper that offloads blocking text similarity search."""
+    return await asyncio.to_thread(_find_similar_by_text_sync, query_text, n_results)
+
+
 async def get_index_count() -> int:
     """Get the number of vehicles in the index."""
     try:
-        collection = get_collection()
-        return collection.count()
+        return await asyncio.to_thread(_get_index_count_sync)
     except Exception:
         return 0
+
+
+def _get_index_count_sync() -> int:
+    """Synchronous index count helper for thread offloading."""
+    collection = get_collection()
+    return collection.count()
 
 
 async def clear_index() -> None:

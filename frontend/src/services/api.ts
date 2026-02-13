@@ -1,5 +1,7 @@
 import type { Lake, Zone, Asset } from '../types';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
 const MOCK_LAKES: Lake[] = [
     {
         name: 'projects/demo/locations/us-central1/lakes/finance',
@@ -52,7 +54,7 @@ export const apiService = {
 
     // Real backend call
     sendChat: async (message: string, sessionId: string) => {
-        const response = await fetch('http://localhost:8000/api/chat', {
+        const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message, session_id: sessionId })
@@ -62,7 +64,7 @@ export const apiService = {
 
     // T03: FCRA consent submission
     submitConsent: async (customerId: string, consentType: string = 'soft_pull', legalTextVersion: string = 'v2026.1') => {
-        const response = await fetch('http://localhost:8000/api/consent', {
+        const response = await fetch(`${API_BASE_URL}/api/consent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -76,13 +78,45 @@ export const apiService = {
 
     // T03: Check consent status
     checkConsent: async (customerId: string) => {
-        const response = await fetch(`http://localhost:8000/api/consent/check/${customerId}`);
+        const response = await fetch(`${API_BASE_URL}/api/consent/check/${customerId}`);
         return response.json();
     },
 
     // T03: Get consent legal text
     getConsentLegalText: async (version: string = 'v2026.1', dealerName: string = 'Mini-Lakebed Demo Dealer') => {
-        const response = await fetch(`http://localhost:8000/api/consent/legal-text?version=${version}&dealer_name=${encodeURIComponent(dealerName)}`);
+        const response = await fetch(`${API_BASE_URL}/api/consent/legal-text?version=${version}&dealer_name=${encodeURIComponent(dealerName)}`);
         return response.json();
+    },
+
+    // T06: Download adverse action PDF
+    downloadAdverseActionPdf: async (noticeData: any, language: string = 'en') => {
+        const response = await fetch(`${API_BASE_URL}/api/documents/adverse-action/pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...noticeData, language })
+        });
+        return response.blob();
+    },
+
+    // T06: Download offering price PDF
+    downloadOfferingPricePdf: async (vehicle: any, components: any, language: string = 'en') => {
+        const response = await fetch(`${API_BASE_URL}/api/documents/offering-price/pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehicle, components, language })
+        });
+        return response.blob();
+    },
+
+    // T06: Get sample adverse action PDF
+    getSampleAdverseActionPdf: async (language: string = 'en') => {
+        const response = await fetch(`${API_BASE_URL}/api/documents/adverse-action/sample?language=${language}`);
+        return response.blob();
+    },
+
+    // T06: Get sample offering price PDF
+    getSampleOfferingPricePdf: async (language: string = 'en') => {
+        const response = await fetch(`${API_BASE_URL}/api/documents/offering-price/sample?language=${language}`);
+        return response.blob();
     }
 };

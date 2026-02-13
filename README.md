@@ -28,22 +28,37 @@ A governed agentic AI demo for automotive inventory Q&A and payment estimates.
 - Node.js 18+
 - Ollama installed (`brew install ollama`)
 
-### Backend Setup
+### One-Command Demo Startup
 
 ```bash
-cd backend
+cd mini-lakebed-demo
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-python -m scripts.seed_data  # Load synthetic data
-uvicorn app.main:app --reload
+pip install -r backend/requirements.txt
+cd frontend && npm install && cd ..
+./scripts/start_demo.sh
 ```
 
-### Frontend Setup
+This single command will:
+- seed inventory/customers/deals/compliance logs for demo (`1200 / 100 / 50 / 1000`)
+- start backend (`http://localhost:8000`)
+- start frontend (`http://localhost:5173`)
+
+Use `./scripts/start_demo.sh --no-seed` to restart services without reseeding.
+
+### Manual Startup
 
 ```bash
+cd mini-lakebed-demo
+source venv/bin/activate
+python -m scripts.seed_data --vehicles 1200 --customers 100 --deals 50 --compliance-logs 1000
+
+# terminal 1
+cd backend
+../venv/bin/python -m uvicorn app.main:app --reload
+
+# terminal 2
 cd frontend
-npm install
 npm run dev
 ```
 

@@ -5,7 +5,7 @@ Per 03_implementation_dummy_data_plan.md §1.4 ComplianceLog (Regulatory Event E
 Per 02_strategic_blueprint.md §3.2.2 Regulatory Audit Log Schema
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
@@ -161,8 +161,7 @@ class ComplianceLog(BaseModel):
                 )
         return self
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ComplianceLogCreate(BaseModel):
@@ -218,5 +217,4 @@ class AuditLogEntry(BaseModel):
             raise ValueError('payload_hash must be a 64-character SHA-256 hex string')
         return v.lower()
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,0 +1,110 @@
+.offering-price {
+    background: linear-gradient(135deg, #1a1f2e 0%, #141821 100%);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: 380px;
+    margin: 10px 0;
+}
+
+.offering-price.sb766-compliant {
+    border-left: 3px solid #22c55e;
+}
+
+.offering-price .offering-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.offering-price .offering-header .icon {
+    color: #6366f1;
+}
+
+.offering-price h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #e2e8f0;
+}
+
+.offering-price .vehicle-title {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.offering-price .price-breakdown {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.offering-price .price-breakdown td {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    font-size: 14px;
+}
+
+.offering-price .price-breakdown td:last-child {
+    text-align: right;
+}
+
+.offering-price .price-breakdown .amount {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    color: #e2e8f0;
+}
+
+.offering-price .price-breakdown tfoot tr {
+    border-top: 2px solid rgba(34, 197, 94, 0.3);
+}
+
+.offering-price .price-breakdown .total-row td {
+    padding-top: 12px;
+    border-bottom: none;
+}
+
+.offering-price .price-breakdown .total-row strong {
+    color: #22c55e;
+    font-size: 16px;
+}
+
+.offering-price .government-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.offering-price .government-notice svg {
+    color: #6366f1;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.offering-price .government-notice p {
+    margin: 0;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.offering-price .sb766-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 20px;
+}
+
+.offering-price .sb766-badge span {
+    font-size: 11px;
+    color: #22c55e;
+    font-weight: 500;
+}

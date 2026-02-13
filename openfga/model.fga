@@ -1,0 +1,34 @@
+model
+  schema 1.1
+
+type user
+
+type dealership
+  relations
+    define member: [user]
+    define general_manager: [user]
+    define finance_manager: [user]
+    define sales_manager: [user]
+
+type deal
+  relations
+    define owner: [user]
+    define dealership: [dealership]
+    # A viewer can see the deal structure but not PII
+    define viewer: [user, dealership#member] or editor
+    # An editor can change numbers
+    define editor: [user] or owner or dealership#finance_manager or dealership#sales_manager
+    # An auditor can see the history but change nothing
+    define auditor: [user] or dealership#general_manager
+
+type compliance_log
+  relations
+    define viewer: [user] or deal#auditor
+    # Only specific compliance officers can see the raw credit denial reasons
+    define sensitive_viewer: [user]
+
+type customer_profile
+  relations
+    define owner: [user]  # The customer themselves
+    define can_view_pii: [user] or owner
+    define can_view_masked: [user, dealership#member]

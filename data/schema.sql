@@ -118,11 +118,12 @@ CREATE TABLE IF NOT EXISTS lender_rules (
 
 -- Audit logs table: Request/response logging
 -- Per 02_strategic_blueprint.md §3.2.2 Regulatory Audit Log Schema
+-- T05: Added previous_hash for Merkle-style hash chain integrity
 CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
+    session_id TEXT,  -- Optional for non-session audit entries
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    action TEXT NOT NULL,
+    action TEXT,  -- Legacy field for backwards compatibility
     user_input TEXT,
     request_params TEXT,
     response_data TEXT,
@@ -130,11 +131,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     calculation_trace TEXT,
     processing_time_ms INTEGER,
     error TEXT,
-    -- T01 Extensions: Regulatory audit fields
+    -- T01/T05 Extensions: Regulatory audit fields
     transaction_id TEXT,  -- UUID
     actor TEXT,  -- user | agent:conversationalist | agent:fin_calc | agent:compliance
     event_type TEXT,  -- rate_inquiry | soft_pull_consent | adverse_action_generated | disclosure_presented
     payload_hash TEXT,  -- SHA-256 hex (64 chars)
+    previous_hash TEXT,  -- T05: Previous entry's payload_hash for chain integrity
     regulatory_flags TEXT  -- JSON: {fcra_compliant, sb766_disclosure_verified, adverse_action_reason_code}
 );
 

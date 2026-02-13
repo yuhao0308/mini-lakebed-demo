@@ -10,6 +10,7 @@ Tests all session state fields:
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 from datetime import datetime
 
@@ -68,7 +69,7 @@ def sample_payment():
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def clean_session():
     """Provide a clean session for each test."""
     session_id = f"test-session-{datetime.now().timestamp()}"

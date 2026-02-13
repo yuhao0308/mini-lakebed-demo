@@ -1,0 +1,69 @@
+{
+  "tuples": [
+    {
+      "user": "user:sales_rep_1",
+      "relation": "member",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:sales_rep_2",
+      "relation": "member",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:sales_rep_3",
+      "relation": "member",
+      "object": "dealership:store_b"
+    },
+    {
+      "user": "user:finance_mgr_1",
+      "relation": "finance_manager",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:finance_mgr_1",
+      "relation": "member",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:sales_mgr_1",
+      "relation": "sales_manager",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:sales_mgr_1",
+      "relation": "member",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:gm_1",
+      "relation": "general_manager",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:gm_1",
+      "relation": "member",
+      "object": "dealership:store_a"
+    },
+    {
+      "user": "user:compliance_officer_1",
+      "relation": "sensitive_viewer",
+      "object": "compliance_log:log_001"
+    },
+    {
+      "user": "user:sales_rep_1",
+      "relation": "owner",
+      "object": "deal:deal_001"
+    },
+    {
+      "user": "dealership:store_a",
+      "relation": "dealership",
+      "object": "deal:deal_001"
+    },
+    {
+      "user": "user:customer_1",
+      "relation": "owner",
+      "object": "customer_profile:customer_1"
+    }
+  ]
+}

@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import SoftPullCard from '../Consent/SoftPullCard'
+import SuggestedQuestions from './SuggestedQuestions'
+import { composeQuery } from './SuggestedQuestions'
+import type { FilterValues, Suggestion, VehicleCategory } from './SuggestedQuestions'
 import { apiService } from '../../services/api'
 import './ChatPane.css'
 
@@ -18,6 +21,80 @@ interface ConsentState {
     vehicleId: number | null
 }
 
+/* ──────────────────────────────────────────────
+   Suggestion sets — context-aware
+   ────────────────────────────────────────────── */
+
+const WELCOME_SUGGESTIONS: Suggestion[] = [
+    { icon: '🔍', text: 'Show me Toyota Camry sedans under $30,000', description: 'Search by make, model, and price range' },
+    { icon: '🚗', text: 'Show me Honda SUVs', description: 'Browse SUVs from a specific brand' },
+    { icon: '🏷️', text: 'Find trucks under $25,000', description: 'Filter by body style and budget' },
+]
+
+const AFTER_SEARCH: Suggestion[] = [
+    { icon: '👆', text: 'Tell me about the first one' },
+    { icon: '🔢', text: 'Tell me about #3' },
+]
+
+const AFTER_VEHICLE: Suggestion[] = [
+    { icon: '💰', text: 'How much is the monthly payment?' },
+    { icon: '✅', text: 'Can I get approved?', tooltip: 'Runs a soft credit check that won\'t affect your credit score. Requires FCRA consent first.' },
+    { icon: '🔄', text: 'Show me similar vehicles' },
+]
+
+const AFTER_OFFERING_PRICE: Suggestion[] = [
+    { icon: '✅', text: 'Can I get approved?', tooltip: 'Runs a soft credit check that won\'t affect your credit score. Requires FCRA consent first.' },
+    { icon: '💳', text: 'Set credit & down payment', type: 'credit-input' as const },
+]
+
+const AFTER_CONSENT: Suggestion[] = [
+    { icon: '💳', text: 'Set credit & down payment', type: 'credit-input' as const },
+]
+
+const AFTER_PAYMENT: Suggestion[] = [
+    { icon: '🔍', text: 'Show me Honda vehicles' },
+    { icon: '✅', text: 'Can I get approved?', tooltip: 'Runs a soft credit check that won\'t affect your credit score. Requires FCRA consent first.' },
+]
+
+const createEmptyFilters = (): FilterValues => ({
+    price: '',
+    year: '',
+    brand: '',
+    mileage: '',
+})
+
+/* ──────────────────────────────────────────────
+   Determine which suggestions to show
+   ────────────────────────────────────────────── */
+
+function getSuggestions(messages: Message[]): { suggestions: Suggestion[]; variant: 'welcome' | 'inline' } | null {
+    if (messages.length <= 1) {
+        return { suggestions: WELCOME_SUGGESTIONS, variant: 'welcome' }
+    }
+
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+    if (!lastAssistant) return null
+
+    const tools = lastAssistant.tool_calls || []
+    const hasToolType = (name: string) => tools.some((tc: any) => tc.tool === name)
+
+    if (hasToolType('estimate_payment')) return { suggestions: AFTER_PAYMENT, variant: 'inline' }
+    if (hasToolType('offering_price') || hasToolType('compliance_check')) return { suggestions: AFTER_OFFERING_PRICE, variant: 'inline' }
+    if (hasToolType('get_vehicle')) return { suggestions: AFTER_VEHICLE, variant: 'inline' }
+    if (hasToolType('search_inventory')) return { suggestions: AFTER_SEARCH, variant: 'inline' }
+
+    const content = lastAssistant.content.toLowerCase()
+    if (content.includes('credit pre-qualification') || content.includes('credit score') || content.includes('describe your credit')) {
+        return { suggestions: AFTER_CONSENT, variant: 'inline' }
+    }
+
+    return null
+}
+
+/* ──────────────────────────────────────────────
+   ChatPane component
+   ────────────────────────────────────────────── */
+
 const ChatPane: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -27,6 +104,9 @@ const ChatPane: React.FC = () => {
         }
     ])
     const [loading, setLoading] = useState(false)
+    const [inputValue, setInputValue] = useState('')
+    const [selectedCategory, setSelectedCategory] = useState<VehicleCategory | null>(null)
+    const [filters, setFilters] = useState<FilterValues>(createEmptyFilters())
     const [consentState, setConsentState] = useState<ConsentState>({
         required: false,
         customerId: null,
@@ -52,6 +132,9 @@ const ChatPane: React.FC = () => {
         }
 
         setMessages(prev => [...prev, userMsg])
+        setInputValue('')
+        setSelectedCategory(null)
+        setFilters(createEmptyFilters())
         setLoading(true)
 
         try {
@@ -66,7 +149,6 @@ const ChatPane: React.FC = () => {
 
             setMessages(prev => [...prev, assistantMsg])
 
-            // T03: Check if consent is required
             if (response.tool_calls) {
                 const consentCall = response.tool_calls.find(
                     (tc: any) => tc.tool === 'require_consent' && tc.results?.requires_consent
@@ -91,7 +173,6 @@ const ChatPane: React.FC = () => {
         }
     }
 
-    // T03: Handle consent submission
     const handleConsent = async () => {
         if (!consentState.customerId) return
 
@@ -100,8 +181,6 @@ const ChatPane: React.FC = () => {
             const result = await apiService.submitConsent(consentState.customerId)
             if (result.success) {
                 setConsentState({ required: false, customerId: null, vehicleId: null })
-
-                // Add system message about consent
                 setMessages(prev => [...prev, {
                     role: 'assistant',
                     content: 'Thank you for providing consent. I can now proceed with the credit pre-qualification. Please tell me your approximate credit score or describe your credit (excellent, good, fair, needs work).',
@@ -126,7 +205,6 @@ const ChatPane: React.FC = () => {
         }
     }
 
-    // T03: Handle consent cancellation
     const handleCancelConsent = () => {
         setConsentState({ required: false, customerId: null, vehicleId: null })
         setMessages(prev => [...prev, {
@@ -136,13 +214,58 @@ const ChatPane: React.FC = () => {
         }])
     }
 
+    const handleSuggestionSelect = (text: string) => {
+        setInputValue(text)
+        setTimeout(() => {
+            const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="chat-input"]')
+            textarea?.focus()
+        }, 0)
+    }
+
+    const handleCategorySelect = (category: VehicleCategory) => {
+        const resetFilters = createEmptyFilters()
+        setSelectedCategory(category)
+        setFilters(resetFilters)
+        setInputValue(composeQuery(category, resetFilters))
+    }
+
+    const handleFilterChange = (key: keyof FilterValues, value: string) => {
+        if (!selectedCategory) {
+            return
+        }
+
+        const nextFilters: FilterValues = { ...filters, [key]: value }
+        setFilters(nextFilters)
+        setInputValue(composeQuery(selectedCategory, nextFilters))
+    }
+
+    const handleDismissFilters = () => {
+        setSelectedCategory(null)
+        setFilters(createEmptyFilters())
+    }
+
+    const suggestionData = !loading && !consentState.required ? getSuggestions(messages) : null
+
     return (
-        <div className="chat-pane">
-            <div className="chat-messages">
+        <div className="chat-pane" data-testid="chat-pane">
+            <div className="chat-messages" data-testid="chat-messages">
                 {messages.map((msg, idx) => (
-                    <MessageBubble key={idx} message={msg} />
+                    <MessageBubble key={idx} message={msg} index={idx} />
                 ))}
-                {/* T03: Render SoftPullCard when consent is required */}
+
+                {suggestionData?.variant === 'welcome' && (
+                    <SuggestedQuestions
+                        suggestions={suggestionData.suggestions}
+                        onSelect={handleSuggestionSelect}
+                        variant="welcome"
+                        selectedCategory={selectedCategory}
+                        filters={filters}
+                        onCategorySelect={handleCategorySelect}
+                        onFilterChange={handleFilterChange}
+                        onDismissFilters={handleDismissFilters}
+                    />
+                )}
+
                 {consentState.required && (
                     <SoftPullCard
                         onConsent={handleConsent}
@@ -152,7 +275,7 @@ const ChatPane: React.FC = () => {
                     />
                 )}
                 {loading && (
-                    <div className="message assistant typing">
+                    <div className="message assistant typing" data-testid="typing-indicator">
                         <div className="typing-indicator">
                             <span></span><span></span><span></span>
                         </div>
@@ -161,8 +284,23 @@ const ChatPane: React.FC = () => {
                 <div ref={messagesEndRef} />
             </div>
 
+            {suggestionData?.variant === 'inline' && (
+                <div className="chat-suggestions-bar">
+                    <SuggestedQuestions
+                        suggestions={suggestionData.suggestions}
+                        onSelect={handleSuggestionSelect}
+                        variant="inline"
+                    />
+                </div>
+            )}
+
             <div className="chat-footer">
-                <ChatInput onSend={handleSendMessage} disabled={loading || consentState.required} />
+                <ChatInput
+                    onSend={handleSendMessage}
+                    disabled={loading || consentState.required}
+                    value={inputValue}
+                    onChange={setInputValue}
+                />
             </div>
         </div>
     )

@@ -1,0 +1,79 @@
+.cancellation-disclosure {
+    background: linear-gradient(135deg, #1f2937 0%, #1a1f2e 100%);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-left: 3px solid #fbbf24;
+    max-width: 400px;
+    margin: 10px 0;
+}
+
+.cancellation-disclosure .disclosure-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.cancellation-disclosure .disclosure-header .icon {
+    color: #fbbf24;
+}
+
+.cancellation-disclosure h4 {
+    margin: 0;
+    font-size: 16px;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.cancellation-disclosure .disclosure-content {
+    margin-bottom: 15px;
+}
+
+.cancellation-disclosure .disclosure-content p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.5;
+}
+
+.cancellation-disclosure .disclosure-content strong {
+    color: #e2e8f0;
+}
+
+.cancellation-disclosure .option-cost {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(251, 191, 36, 0.1);
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.cancellation-disclosure .option-cost svg {
+    color: #fbbf24;
+}
+
+.cancellation-disclosure .option-cost span {
+    font-size: 14px;
+    color: #e2e8f0;
+}
+
+.cancellation-disclosure .option-cost strong {
+    color: #22c55e;
+    font-size: 16px;
+}
+
+.cancellation-disclosure .legal-notice {
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cancellation-disclosure .legal-notice p {
+    margin: 0;
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+    font-style: italic;
+}

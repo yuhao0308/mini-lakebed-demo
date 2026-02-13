@@ -1,0 +1,49 @@
+{
+  "offering_price": {
+    "title": "Precio de Oferta Oficial",
+    "vehicle_price": "Precio del Vehículo",
+    "doc_fee": "Cargo por Documentación",
+    "total": "Precio de Oferta Total",
+    "government_notice": "Los impuestos gubernamentales y tarifas de registro son adicionales y se calculan según su ubicación."
+  },
+  "consent": {
+    "title": "Pre-Calificación de Crédito",
+    "text": "Entiendo que al hacer clic en 'Enviar', estoy proporcionando 'instrucciones escritas' bajo la FCRA autorizando a {dealer} a obtener información crediticia personal de mi perfil de crédito mantenido por una o más agencias de informes de consumidores.",
+    "soft_pull_notice": "Esta es una 'consulta suave' que no afectará su puntaje de crédito.",
+    "agree": "Acepto",
+    "cancel": "Cancelar"
+  },
+  "adverse_action": {
+    "title": "Decisión de Crédito",
+    "reasons_title": "Razones Principales de Esta Decisión",
+    "counter_offer": "Términos Alternativos Disponibles",
+    "download_pdf": "Descargar Aviso Formal (PDF)",
+    "bureau_info": "Información del Buró",
+    "disclaimer": "Este aviso se proporciona en cumplimiento con la Ley de Igualdad de Oportunidad de Crédito (Regulación B)."
+  },
+  "payment": {
+    "title": "Estructura de Su Trato",
+    "price": "Precio",
+    "taxes": "Impuestos",
+    "registration": "Registro",
+    "down_payment": "Pago Inicial",
+    "term": "Plazo",
+    "monthly_payment": "Pago Mensual",
+    "apr": "APR",
+    "tier": "Nivel",
+    "amount_financed": "Monto Financiado",
+    "finance_charge": "Cargo por Financiamiento",
+    "total_payments": "Total de Pagos"
+  },
+  "cancellation": {
+    "title": "Su Derecho a Cancelar",
+    "description": "Bajo la ley de California, usted tiene el derecho de comprar una Opción de Cancelación de Contrato de 2 Días.",
+    "terms": "Si la compra, puede cancelar este contrato dentro de 2 días o 250 millas, lo que ocurra primero.",
+    "cost_label": "Costo de la Opción de Cancelación"
+  },
+  "common": {
+    "demo_disclaimer": "SOLO DEMOSTRACIÓN: Reglas sintéticas. No es un compromiso de préstamo.",
+    "sb766_compliant": "Cumple con SB 766",
+    "months": "Meses"
+  }
+}

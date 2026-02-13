@@ -2,7 +2,7 @@
 Pydantic models for API requests and responses.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -74,8 +74,7 @@ class Vehicle(VehicleBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VehicleSearchParams(BaseModel):
@@ -114,8 +113,7 @@ class LenderRule(BaseModel):
     doc_fee: float = 0
     is_demo: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Payment Models
@@ -172,6 +170,7 @@ class ChatRequest(BaseModel):
 class ToolCall(BaseModel):
     tool: str
     params: dict
+    results: Optional[dict] = None
     result_count: Optional[int] = None
 
 
@@ -273,8 +272,7 @@ class TaxRate(BaseModel):
     tax_basis_rule: str
     trade_in_credit: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdverseActionCode(BaseModel):
@@ -282,8 +280,7 @@ class AdverseActionCode(BaseModel):
     code: str
     text: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LenderRuleExtended(LenderRule):
@@ -292,5 +289,4 @@ class LenderRuleExtended(LenderRule):
     dealer_reserve_cap: float = 2.5
     stips_required: Optional[List[str]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

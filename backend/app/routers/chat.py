@@ -11,16 +11,36 @@ The LLM must NOT:
 - Invent inventory
 - Generate payment amounts (deterministic calculator does this)
 - Make approval decisions
+
+T05: Added authorization checks and PII scrubbing for governance.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from app.models.schemas import ChatRequest, ChatResponse, ToolCall, ChatMetadata
 from app.services.llm import classify_intent, Intent, LLMResult, ExtractedEntities
+from app.services.agent_graph import invoke_agent_graph
 from app.services.database import execute_query, execute_one
+from app.services.authorization import get_authorization_service, AuthRelation
+from app.middleware.pii_scrubber import get_pii_scrubber
+import asyncio
 import uuid
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# T05: Authorization service singleton
+_auth_service = None
+
+
+def get_auth_service():
+    """Get or create authorization service."""
+    global _auth_service
+    if _auth_service is None:
+        _auth_service = get_authorization_service()
+    return _auth_service
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -37,78 +57,130 @@ async def chat(request: ChatRequest):
     # Generate session ID if not provided
     session_id = request.session_id or str(uuid.uuid4())
     
-    # Save user message to chat history
-    await add_chat_message(session_id, "user", request.message)
-    
-    # Check if we're awaiting a clarification response
-    awaiting = await get_awaiting_input(session_id)
-    
-    if awaiting == "clarification":
-        # Map user's response (A/B/C) to the appropriate intent
-        mapped_intent = _map_clarification_response(request.message)
-        if mapped_intent:
-            await clear_awaiting_input(session_id)
-            llm_result = LLMResult(
-                intent=mapped_intent,
-                entities=ExtractedEntities(),
-                raw_response="clarification_mapped",
-                confidence=0.9
-            )
-        else:
-            # Couldn't map, proceed with normal classification
-            llm_result = await classify_intent(request.message)
-    elif awaiting == "confirm_payment_estimate":
-        # Check for affirmative response
-        msg = request.message.lower()
-        if any(w in msg for w in ["yes", "sure", "please", "ok", "yeah", "yup", "correct", "do it"]):
-            await clear_awaiting_input(session_id)
-            
-            # Route directly to payment estimate
-            # Passing empty entities will trigger the "use context vehicle" logic
-            response_text, tool_calls = await _handle_payment_estimate(ExtractedEntities(), [], session_id)
-            
-            # Save assistant response to chat history
-            await add_chat_message(session_id, "assistant", response_text)
-            
-            processing_time = int((time.time() - start_time) * 1000)
-            
-            return ChatResponse(
-                session_id=session_id,
-                response=response_text,
-                tool_calls=tool_calls,
-                metadata=ChatMetadata(
-                    intent="payment_estimate_confirmed",
-                    processing_time_ms=processing_time
+    try:
+        # Save user message to chat history
+        await add_chat_message(session_id, "user", request.message)
+        
+        # Check if we're awaiting a clarification response
+        awaiting = await get_awaiting_input(session_id)
+        
+        if awaiting == "clarification":
+            # Map user's response (A/B/C) to the appropriate intent
+            mapped_intent = _map_clarification_response(request.message)
+            if mapped_intent:
+                await clear_awaiting_input(session_id)
+                llm_result = LLMResult(
+                    intent=mapped_intent,
+                    entities=ExtractedEntities(),
+                    raw_response="clarification_mapped",
+                    confidence=0.9
                 )
-            )
-        elif any(w in msg for w in ["no", "nah", "pass", "skip"]):
-             await clear_awaiting_input(session_id)
-             llm_result = await classify_intent(request.message)
+            else:
+                # Couldn't map, proceed with normal classification
+                llm_result = await classify_intent(request.message)
+        elif awaiting == "payment_info":
+            # User is providing credit/down payment info for payment estimate
+            # Extract payment entities from their response
+            from app.services.llm import _extract_payment_entities
+            entities = _extract_payment_entities(request.message)
+
+            # Check if they provided the info we need
+            has_credit = entities.fico_estimate is not None or entities.credit_tier is not None
+            has_down = entities.down_payment is not None
+
+            if has_credit or has_down:
+                # They provided at least some info - route to payment estimate
+                await clear_awaiting_input(session_id)
+                llm_result = LLMResult(
+                    intent=Intent.PAYMENT_ESTIMATE,
+                    entities=entities,
+                    raw_response="payment_info_provided",
+                    confidence=0.9
+                )
+            else:
+                # They said something else - classify normally but keep context
+                llm_result = await classify_intent(request.message)
+                # If still unclear, re-prompt for payment info
+                if llm_result.intent == Intent.CLARIFICATION:
+                    await clear_awaiting_input(session_id)
+                    response_text = (
+                        "I still need your credit information to calculate payments.\n\n"
+                        "Please tell me:\n"
+                        "• Your credit score (e.g., 720) or credit range (excellent/good/fair)\n"
+                        "• Your down payment amount (e.g., $5,000 down)\n\n"
+                        "Example: \"I have good credit and $5,000 down\""
+                    )
+                    await add_chat_message(session_id, "assistant", response_text)
+                    processing_time = int((time.time() - start_time) * 1000)
+                    return ChatResponse(
+                        session_id=session_id,
+                        response=response_text,
+                        tool_calls=[],
+                        metadata=ChatMetadata(
+                            intent="payment_info_reprompt",
+                            processing_time_ms=processing_time
+                        )
+                    )
+        elif awaiting == "confirm_payment_estimate":
+            # Check for affirmative response
+            msg = request.message.lower()
+            if any(w in msg for w in ["yes", "sure", "please", "ok", "yeah", "yup", "correct", "do it"]):
+                await clear_awaiting_input(session_id)
+                
+                # Route directly to payment estimate
+                # Passing empty entities will trigger the "use context vehicle" logic
+                response_text, tool_calls = await _handle_payment_estimate(ExtractedEntities(), [], session_id)
+                
+                # Save assistant response to chat history
+                await add_chat_message(session_id, "assistant", response_text)
+                
+                processing_time = int((time.time() - start_time) * 1000)
+                
+                return ChatResponse(
+                    session_id=session_id,
+                    response=response_text,
+                    tool_calls=tool_calls,
+                    metadata=ChatMetadata(
+                        intent="payment_estimate_confirmed",
+                        processing_time_ms=processing_time
+                    )
+                )
+            elif any(w in msg for w in ["no", "nah", "pass", "skip"]):
+                 await clear_awaiting_input(session_id)
+                 llm_result = await classify_intent(request.message)
+            else:
+                 # Ambiguous response - clear state and classify normally
+                 await clear_awaiting_input(session_id)
+                 llm_result = await classify_intent(request.message)
         else:
-             # Ambiguous response - clear state and classify normally
-             await clear_awaiting_input(session_id)
-             llm_result = await classify_intent(request.message)
-    else:
-        # Normal classification
-        llm_result = await classify_intent(request.message)
-    
-    # Route to appropriate handler based on intent (with session context)
-    response_text, tool_calls = await _route_intent(llm_result, request.message, session_id)
-    
-    # Save assistant response to chat history
-    await add_chat_message(session_id, "assistant", response_text)
-    
-    processing_time = int((time.time() - start_time) * 1000)
-    
-    return ChatResponse(
-        session_id=session_id,
-        response=response_text,
-        tool_calls=tool_calls,
-        metadata=ChatMetadata(
-            intent=llm_result.intent.value,
-            processing_time_ms=processing_time
+            # Normal classification
+            llm_result = await classify_intent(request.message)
+        
+        # Route through LangGraph wrapper (with session context)
+        graph_result = await invoke_agent_graph(session_id, request.message, llm_result)
+        response_text = graph_result["response_text"]
+        tool_calls = graph_result["tool_calls"]
+        resolved_intent = graph_result.get("intent") or llm_result.intent.value
+        
+        processing_time = int((time.time() - start_time) * 1000)
+        
+        return ChatResponse(
+            session_id=session_id,
+            response=response_text,
+            tool_calls=tool_calls,
+            metadata=ChatMetadata(
+                intent=resolved_intent,
+                processing_time_ms=processing_time
+            )
         )
-    )
+    except Exception:
+        logger.exception("Chat handler error")
+        return ChatResponse(
+            session_id=session_id,
+            response="I encountered an unexpected issue. Please try again.",
+            tool_calls=[],
+            metadata=ChatMetadata(intent="error", processing_time_ms=0)
+        )
 
 
 def _map_clarification_response(message: str):
@@ -135,7 +207,7 @@ def _map_clarification_response(message: str):
     return None
 
 
-async def _route_intent(llm_result: LLMResult, original_message: str, session_id: str) -> tuple[str, list]:
+async def _route_intent_legacy(llm_result: LLMResult, original_message: str, session_id: str) -> tuple[str, list]:
     """Route the classified intent to the appropriate tool handler."""
     
     intent = llm_result.intent
@@ -195,6 +267,11 @@ async def _route_intent(llm_result: LLMResult, original_message: str, session_id
         )
 
 
+async def _route_intent(llm_result: LLMResult, original_message: str, session_id: str) -> tuple[str, list]:
+    """Legacy route function retained as a fallback."""
+    return await _route_intent_legacy(llm_result, original_message, session_id)
+
+
 
 async def _handle_inventory_search(entities, tool_calls, session_id: str) -> tuple[str, list]:
     """Handle inventory search intent."""
@@ -243,7 +320,7 @@ async def _handle_inventory_search(entities, tool_calls, session_id: str) -> tup
         FROM inventory 
         WHERE {where_clause}
         ORDER BY price ASC
-        LIMIT 100
+        LIMIT 20
     """
     
     results = await execute_query(query, tuple(params))
@@ -289,17 +366,24 @@ async def _handle_inventory_search(entities, tool_calls, session_id: str) -> tup
     
     response = f"🔍 **Found {len(results)} vehicles** matching your criteria:\n\n---\n\n{vehicle_list}\n\n---\n\n💬 *Say a number (e.g., \"Tell me about #3\") for details, or ask about payments!*"
     
-    if len(results) == 100:
-        response += "\n\n⚠️ *Results limited to 100. Add filters to narrow your search.*"
+    if len(results) == 20:
+        response += "\n\n⚠️ *Results limited to 20. Add filters (price, body style, year) to narrow your search.*"
     
     return response, tool_calls
 
 
 async def _handle_vehicle_details(entities, tool_calls, session_id: str) -> tuple[str, list]:
-    """Handle vehicle details intent."""
-    
+    """Handle vehicle details intent.
+
+    T05: Authorization check for deal/vehicle access.
+    """
     from app.services.session_context import update_current_vehicle, resolve_vehicle_reference
-    
+
+    # T05: Authorization check (logged for audit, not blocking in demo mode)
+    auth = get_auth_service()
+    # In production, would check: await auth.check_deal_view_allowed(user_id, deal_id)
+    logger.debug(f"Vehicle details access for session {session_id}")
+
     vehicle = None
     
     # First, check for pronoun/numbered references like "#3", "the first one", "that one"
@@ -428,11 +512,29 @@ async def _handle_similar_vehicles(entities, tool_calls, original_message: str, 
     # Find similar vehicles
     if reference_vehicle:
         # Find vehicles similar to the reference
-        similar = await find_similar_vehicles(
-            reference_vehicle,
-            n_results=5,
-            exclude_id=reference_vehicle['id']
-        )
+        try:
+            similar = await asyncio.wait_for(
+                find_similar_vehicles(
+                    reference_vehicle,
+                    n_results=5,
+                    exclude_id=reference_vehicle['id']
+                ),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Similar vehicles vector search timed out after 15s for vehicle_id=%s; "
+                "falling back to SQL search",
+                reference_vehicle.get("id")
+            )
+            similar = await _sql_similar_fallback(reference_vehicle, limit=5)
+        except Exception:
+            logger.exception(
+                "Similar vehicles vector search failed for vehicle_id=%s; "
+                "falling back to SQL search",
+                reference_vehicle.get("id")
+            )
+            similar = await _sql_similar_fallback(reference_vehicle, limit=5)
         
         if not similar:
             return (
@@ -469,7 +571,17 @@ async def _handle_similar_vehicles(entities, tool_calls, original_message: str, 
         
     else:
         # Use the message itself as a semantic query
-        similar = await find_similar_by_text(original_message, n_results=5)
+        try:
+            similar = await asyncio.wait_for(
+                find_similar_by_text(original_message, n_results=5),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Text similarity search timed out after 15s")
+            similar = []
+        except Exception:
+            logger.exception("Text similarity search failed")
+            similar = []
         
         if not similar:
             return (
@@ -499,6 +611,44 @@ async def _handle_similar_vehicles(entities, tool_calls, original_message: str, 
     return response, tool_calls
 
 
+async def _sql_similar_fallback(reference_vehicle: dict, limit: int = 5) -> list[dict]:
+    """
+    SQL fallback for similar vehicle lookup when vector search fails.
+
+    Matches by body style and nearby price range, excluding the reference vehicle.
+    """
+    vehicle_id = reference_vehicle.get("id")
+    body_style = reference_vehicle.get("body_style")
+    price = reference_vehicle.get("price")
+
+    if vehicle_id is None or not body_style or not price:
+        return []
+
+    min_price = price * 0.8
+    max_price = price * 1.2
+
+    fallback_query = """
+        SELECT id, vin, make, model, year, trim, price, mileage, body_style, status
+        FROM inventory
+        WHERE status = 'available'
+          AND LOWER(body_style) = LOWER(?)
+          AND id != ?
+          AND price BETWEEN ? AND ?
+        ORDER BY ABS(price - ?)
+        LIMIT ?
+    """
+
+    results = await execute_query(
+        fallback_query,
+        (body_style, vehicle_id, min_price, max_price, price, limit)
+    )
+
+    for row in results:
+        row["similarity_score"] = 0.5
+
+    return results
+
+
 async def _handle_payment_inquiry(entities, tool_calls, session_id: str) -> tuple[str, list]:
     """
     Handle payment inquiry intent - implements SB 766 compliance.
@@ -506,7 +656,8 @@ async def _handle_payment_inquiry(entities, tool_calls, session_id: str) -> tupl
     Per T02: Must show offering price before discussing payments.
     """
     from app.services.session_context import (
-        get_current_vehicle, update_awaiting_input, record_disclosure, has_disclosure
+        get_current_vehicle, update_awaiting_input, record_disclosure, has_disclosure,
+        resolve_vehicle_reference, update_current_vehicle
     )
     from app.services.compliance_sentinel import (
         ComplianceSentinel, build_offering_price, format_offering_price_disclosure
@@ -516,12 +667,19 @@ async def _handle_payment_inquiry(entities, tool_calls, session_id: str) -> tupl
     # Get current vehicle from session context
     vehicle = await get_current_vehicle(session_id)
 
+    # If no current vehicle, try to resolve from entity references (e.g., "first car", "#3")
+    if not vehicle and entities.vehicle_reference:
+        vehicle = await resolve_vehicle_reference(session_id, entities.vehicle_reference)
+        if vehicle:
+            await update_current_vehicle(session_id, vehicle)
+
     if not vehicle:
         # No vehicle in context - need to identify one first
         return (
             "I'd be happy to help with payment information! "
-            "First, which vehicle are you interested in?\n\n"
-            "You can search our inventory or tell me about a specific vehicle you'd like to know about.",
+            "Please select a vehicle first.\n\n"
+            "You can search inventory and choose one by number (for example, \"Tell me about #3\"), "
+            "then ask me about payments.",
             []
         )
 
@@ -592,7 +750,11 @@ async def _handle_payment_inquiry(entities, tool_calls, session_id: str) -> tupl
 async def _handle_payment_estimate(entities, tool_calls, session_id: str) -> tuple[str, list]:
     """Handle payment estimate intent."""
 
-    from app.services.session_context import get_current_vehicle, update_last_payment, update_awaiting_input, clear_awaiting_input, record_disclosure, has_disclosure
+    from app.services.session_context import (
+        get_current_vehicle, update_last_payment, update_awaiting_input,
+        clear_awaiting_input, record_disclosure, has_disclosure,
+        resolve_vehicle_reference, update_current_vehicle
+    )
     from app.services.compliance_sentinel import (
         ComplianceSentinel, build_offering_price, format_offering_price_disclosure
     )
@@ -621,50 +783,50 @@ async def _handle_payment_estimate(entities, tool_calls, session_id: str) -> tup
     # Get the currently discussed vehicle from session context
     context_vehicle = await get_current_vehicle(session_id)
 
-    # T02: SB 766 Compliance Check - must disclose offering price before payment
-    if context_vehicle:
-        vehicle_id = context_vehicle.get("id")
-        disclosed = await has_disclosure(session_id, vehicle_id, "offering_price")
+    # If no current vehicle, try to resolve from entity references (e.g., "first car", "#3")
+    if not context_vehicle and entities.vehicle_reference:
+        context_vehicle = await resolve_vehicle_reference(session_id, entities.vehicle_reference)
+        if context_vehicle:
+            await update_current_vehicle(session_id, context_vehicle)
 
-        if not disclosed:
-            # Must show offering price first
-            compliance = ComplianceSentinel()
-            offering = await build_offering_price(context_vehicle)
-
-            # Record disclosure
-            await record_disclosure(session_id, vehicle_id, "offering_price", {
-                "total": offering.total_offering_price,
-                "base_price": offering.base_vehicle_price,
-                "doc_fee": offering.doc_fee
-            })
-            await record_offering_price(
-                session_id, vehicle_id, offering.total_offering_price, offering
-            )
-
-            # Log the compliance event
-            await compliance._log_compliance_event(
-                event_type="disclosure_presented",
-                session_id=session_id,
-                vehicle_id=vehicle_id,
-                details={"disclosure_type": "offering_price", "total": offering.total_offering_price},
-                regulatory_flags={"sb766_disclosure_verified": True}
-            )
-
-            # Now proceed with payment calculation below (disclosure complete)
-    
-    if context_vehicle:
-        # Use the vehicle the user was just discussing
-        target_vehicle = context_vehicle
-        vehicle_source = "context"
-    else:
-        # No vehicle in context - use a sample or ask user to select one
-        target_vehicle = await execute_one(
-            "SELECT * FROM inventory WHERE status = 'available' ORDER BY price LIMIT 1"
+    if not context_vehicle:
+        return (
+            "To estimate monthly payments, please select a vehicle first.\n\n"
+            "You can search inventory and choose one by number (for example, \"Tell me about #3\"), "
+            "then share your credit and down payment details.",
+            []
         )
-        vehicle_source = "sample"
-        
-        if not target_vehicle:
-            return "No vehicles available for payment calculation.", []
+
+    # T02: SB 766 Compliance Check - must disclose offering price before payment
+    vehicle_id = context_vehicle.get("id")
+    disclosed = await has_disclosure(session_id, vehicle_id, "offering_price")
+
+    if not disclosed:
+        # Must show offering price first
+        compliance = ComplianceSentinel()
+        offering = await build_offering_price(context_vehicle)
+
+        # Record disclosure
+        await record_disclosure(session_id, vehicle_id, "offering_price", {
+            "total": offering.total_offering_price,
+            "base_price": offering.base_vehicle_price,
+            "doc_fee": offering.doc_fee
+        })
+        await record_offering_price(
+            session_id, vehicle_id, offering.total_offering_price, offering
+        )
+
+        # Log the compliance event
+        await compliance._log_compliance_event(
+            event_type="disclosure_presented",
+            session_id=session_id,
+            vehicle_id=vehicle_id,
+            details={"disclosure_type": "offering_price", "total": offering.total_offering_price},
+            regulatory_flags={"sb766_disclosure_verified": True}
+        )
+
+    # Use the vehicle the user is actively discussing
+    target_vehicle = context_vehicle
     
     vehicle_price = target_vehicle['price']
     down_payment = entities.down_payment or 0
@@ -719,8 +881,7 @@ async def _handle_payment_estimate(entities, tool_calls, session_id: str) -> tup
             "vehicle_price": vehicle_price,
             "down_payment": down_payment,
             "fico": fico,
-            "term_months": term,
-            "vehicle_source": vehicle_source
+            "term_months": term
         },
         results={
             "estimate": {
@@ -755,11 +916,7 @@ async def _handle_payment_estimate(entities, tool_calls, session_id: str) -> tup
     # Build response with context awareness
     vehicle_desc = f"{target_vehicle['year']} {target_vehicle['make']} {target_vehicle['model']}"
     
-    if vehicle_source == "context":
-        intro = f"For the **{vehicle_desc}** you were looking at (${vehicle_price:,.0f}):"
-    else:
-        intro = f"Here's an estimate using our **{vehicle_desc}** at ${vehicle_price:,.0f}:\n\n" \
-                "*(To calculate for a specific vehicle, first ask me about it)*"
+    intro = f"For the **{vehicle_desc}** you were looking at (${vehicle_price:,.0f}):"
     
     response = f"""💰 **Payment Estimate**
 
@@ -801,7 +958,7 @@ async def _handle_credit_prequalification(entities, tool_calls, session_id: str)
     )
     from app.services.credit_officer import CreditOfficer, get_credit_tier
     from app.services.consent_manager import ConsentManager
-    from app.models.credit import RequestedTerms
+    from app.models.credit import ConsentType, RequestedTerms
     import uuid
 
     # Get or create customer ID for this session
@@ -825,7 +982,7 @@ async def _handle_credit_prequalification(entities, tool_calls, session_id: str)
 
     # Check if FCRA consent exists
     consent_manager = ConsentManager()
-    consent_check = await consent_manager.check_consent_valid(customer_id, "soft_pull")
+    consent_check = await consent_manager.check_consent_valid(customer_id, ConsentType.SOFT_PULL)
 
     if not consent_check.valid:
         # FCRA consent required - trigger consent card

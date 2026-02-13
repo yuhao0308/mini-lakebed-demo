@@ -1,0 +1,49 @@
+{
+  "offering_price": {
+    "title": "Official Offering Price",
+    "vehicle_price": "Vehicle Price",
+    "doc_fee": "Doc Fee",
+    "total": "Total Offering Price",
+    "government_notice": "Government taxes and registration fees are additional and calculated based on your location."
+  },
+  "consent": {
+    "title": "Credit Pre-Qualification",
+    "text": "I understand that by clicking 'Submit', I am providing 'written instructions' under the FCRA authorizing {dealer} to obtain personal credit information from my credit profile maintained by one or more consumer reporting agencies.",
+    "soft_pull_notice": "This is a 'soft pull' that will not affect your credit score.",
+    "agree": "I Agree",
+    "cancel": "Cancel"
+  },
+  "adverse_action": {
+    "title": "Credit Decision",
+    "reasons_title": "Principal Reasons for This Decision",
+    "counter_offer": "Alternative Terms Available",
+    "download_pdf": "Download Formal Notice (PDF)",
+    "bureau_info": "Bureau Information",
+    "disclaimer": "This notice is provided in compliance with the Equal Credit Opportunity Act (Regulation B)."
+  },
+  "payment": {
+    "title": "Your Deal Structure",
+    "price": "Price",
+    "taxes": "Taxes",
+    "registration": "Registration",
+    "down_payment": "Down Payment",
+    "term": "Term",
+    "monthly_payment": "Monthly Payment",
+    "apr": "APR",
+    "tier": "Tier",
+    "amount_financed": "Amount Financed",
+    "finance_charge": "Finance Charge",
+    "total_payments": "Total of Payments"
+  },
+  "cancellation": {
+    "title": "Your Right to Cancel",
+    "description": "Under California law, you have the right to purchase a 2-Day Contract Cancellation Option.",
+    "terms": "If purchased, you may cancel this contract within 2 days or 250 miles, whichever comes first.",
+    "cost_label": "Cancellation Option Cost"
+  },
+  "common": {
+    "demo_disclaimer": "DEMO ONLY: Synthetic rules. Not a commitment to lend.",
+    "sb766_compliant": "SB 766 Compliant",
+    "months": "Months"
+  }
+}

@@ -1,0 +1,203 @@
+.adverse-action-card {
+    background: linear-gradient(135deg, #1a1f2e 0%, #141821 100%);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-left: 3px solid #ef4444;
+    max-width: 450px;
+    margin: 10px 0;
+}
+
+.adverse-action-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.adverse-action-card .card-header .icon.warning {
+    color: #ef4444;
+}
+
+.adverse-action-card h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #e2e8f0;
+}
+
+.adverse-action-card .applicant-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 15px;
+}
+
+.adverse-action-card .applicant-name {
+    font-size: 14px;
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+.adverse-action-card .decision-date {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.adverse-action-card .reasons-section {
+    margin-bottom: 15px;
+}
+
+.adverse-action-card .reasons-section h4,
+.adverse-action-card .bureau-info h4 {
+    font-size: 14px;
+    color: #94a3b8;
+    margin: 0 0 10px;
+    font-weight: 500;
+}
+
+.adverse-action-card .reasons-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.adverse-action-card .reasons-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.adverse-action-card .reasons-list li:last-child {
+    border-bottom: none;
+}
+
+.adverse-action-card .reason-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: rgba(239, 68, 68, 0.2);
+    border-radius: 50%;
+    font-size: 12px;
+    color: #ef4444;
+    flex-shrink: 0;
+}
+
+.adverse-action-card .reason-text {
+    flex: 1;
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.adverse-action-card .reason-code {
+    font-size: 11px;
+    color: #64748b;
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.adverse-action-card .bureau-info {
+    background: rgba(99, 102, 241, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.adverse-action-card .bureau-info p {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.adverse-action-card .bureau-info p:last-child {
+    margin-bottom: 0;
+}
+
+.adverse-action-card .bureau-info strong {
+    color: #cbd5e1;
+}
+
+.adverse-action-card .counter-offer-section {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.adverse-action-card .counter-offer-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.adverse-action-card .counter-offer-header .icon.success {
+    color: #22c55e;
+}
+
+.adverse-action-card .counter-offer-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #22c55e;
+}
+
+.adverse-action-card .counter-offer-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.adverse-action-card .counter-offer-details .detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.adverse-action-card .counter-offer-details .label {
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.adverse-action-card .counter-offer-details .value {
+    font-size: 14px;
+    color: #e2e8f0;
+    font-weight: 500;
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.adverse-action-card .download-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background: #6366f1;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 12px;
+}
+
+.adverse-action-card .download-button:hover {
+    background: #4f46e5;
+}
+
+.adverse-action-card .disclaimer {
+    margin: 0;
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.4;
+    text-align: center;
+}

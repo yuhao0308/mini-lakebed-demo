@@ -7,6 +7,7 @@ All data is clearly labeled as DEMO ONLY.
 T01 Enhancement: Loads reference data (tax rates, adverse action codes, lender programs)
 """
 
+import argparse
 import sqlite3
 import random
 import json
@@ -20,6 +21,11 @@ DB_PATH = BASE_PATH / "data" / "mini_lakebed.db"
 SCHEMA_PATH = BASE_PATH / "data" / "schema.sql"
 MIGRATIONS_PATH = BASE_PATH / "data" / "migrations"
 REFERENCE_PATH = BASE_PATH / "data" / "reference"
+
+DEFAULT_INVENTORY_COUNT = 1200
+DEFAULT_DEMO_CUSTOMER_COUNT = 100
+DEFAULT_DEMO_DEAL_COUNT = 50
+DEFAULT_DEMO_LOG_COUNT = 1000
 
 
 # Synthetic vehicle data
@@ -82,7 +88,7 @@ def generate_vehicles(count: int = 60):
 
         # Adjust for year
         price = base_price - (2024 - year) * random.randint(1500, 3000)
-        price = max(price, 15000)  # Minimum price
+        price = max(price, 8000) + random.randint(0, 1500)  # Lower floor + jitter
 
         mileage = (2024 - year) * random.randint(8000, 15000)
 
@@ -100,7 +106,7 @@ def generate_vehicles(count: int = 60):
             "exterior_color": random.choice(COLORS),
             "interior_color": random.choice(INTERIOR_COLORS),
             "mileage": mileage,
-            "price": round(price, -2),  # Round to nearest 100
+            "price": round(price, -1),  # Round to nearest 10 to avoid artificial clustering
             "msrp": round(price * 1.15, -2),
             "fuel_type": random.choice(FUEL_TYPES),
             "transmission": "automatic",
@@ -330,7 +336,13 @@ def load_lender_programs(cursor):
     return count
 
 
-def seed_database():
+def seed_database(
+    vehicle_count: int = DEFAULT_INVENTORY_COUNT,
+    include_demo_data: bool = True,
+    demo_customer_count: int = DEFAULT_DEMO_CUSTOMER_COUNT,
+    demo_deal_count: int = DEFAULT_DEMO_DEAL_COUNT,
+    demo_log_count: int = DEFAULT_DEMO_LOG_COUNT
+):
     """Initialize database and seed with synthetic data."""
     # Ensure data directory exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -352,7 +364,7 @@ def seed_database():
     cursor.execute("DELETE FROM lender_rules")
 
     # Insert vehicles with T01 fields
-    vehicles = generate_vehicles(60)
+    vehicles = generate_vehicles(max(1, vehicle_count))
     for v in vehicles:
         cursor.execute("""
             INSERT INTO inventory (
@@ -402,6 +414,23 @@ def seed_database():
     programs_count = load_lender_programs(cursor)
     print(f"Loaded {programs_count} lender programs from reference data")
 
+    demo_summary = None
+    if include_demo_data:
+        try:
+            from scripts.generate_demo_data import seed_demo_data
+        except ImportError:
+            # Fallback for direct script execution from the scripts directory.
+            from generate_demo_data import seed_demo_data
+
+        print("\n--- Loading T06 Demo Data ---")
+        demo_summary = seed_demo_data(
+            conn=conn,
+            compliance_log_count=max(0, demo_log_count),
+            customer_count=max(0, demo_customer_count),
+            deal_count=max(0, demo_deal_count),
+            reset_existing=True
+        )
+
     conn.commit()
     conn.close()
 
@@ -410,11 +439,58 @@ def seed_database():
 
     # Print summary
     print("\n--- T01 Data Foundation Summary ---")
-    print(f"  Vehicles: 60 (with sb766_offering_price)")
+    print(f"  Vehicles: {len(vehicles)} (with sb766_offering_price)")
     print(f"  Lender Rules: {len(rules) + programs_count}")
     print(f"  Tax Jurisdictions: {tax_count}")
     print(f"  Adverse Action Codes: {codes_count}")
 
+    if demo_summary:
+        print("\n--- T06 Demo Data Summary ---")
+        print(f"  Compliance Logs: {demo_summary['compliance_logs']}")
+        print(f"  Customers: {demo_summary['customers']}")
+        print(f"  Deals: {demo_summary['deals']}")
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Seed Mini-Lakebed demo database.")
+    parser.add_argument(
+        "--vehicles",
+        type=int,
+        default=DEFAULT_INVENTORY_COUNT,
+        help=f"Number of synthetic vehicles to seed (default: {DEFAULT_INVENTORY_COUNT})"
+    )
+    parser.add_argument(
+        "--skip-demo-data",
+        action="store_true",
+        help="Only seed T01 base data (inventory, rules, reference tables)."
+    )
+    parser.add_argument(
+        "--customers",
+        type=int,
+        default=DEFAULT_DEMO_CUSTOMER_COUNT,
+        help=f"Number of demo customers to generate (default: {DEFAULT_DEMO_CUSTOMER_COUNT})"
+    )
+    parser.add_argument(
+        "--deals",
+        type=int,
+        default=DEFAULT_DEMO_DEAL_COUNT,
+        help=f"Number of demo deals to generate (default: {DEFAULT_DEMO_DEAL_COUNT})"
+    )
+    parser.add_argument(
+        "--compliance-logs",
+        type=int,
+        default=DEFAULT_DEMO_LOG_COUNT,
+        help=f"Number of compliance logs to generate (default: {DEFAULT_DEMO_LOG_COUNT})"
+    )
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    seed_database()
+    args = _parse_args()
+    seed_database(
+        vehicle_count=args.vehicles,
+        include_demo_data=not args.skip_demo_data,
+        demo_customer_count=args.customers,
+        demo_deal_count=args.deals,
+        demo_log_count=args.compliance_logs
+    )

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Send, Image, Mic } from 'lucide-react'
 import './ChatInput.css'
@@ -6,15 +6,17 @@ import './ChatInput.css'
 interface ChatInputProps {
     onSend: (message: string) => void
     disabled?: boolean
+    value: string
+    onChange: (value: string) => void
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
-    const [value, setValue] = useState('')
+const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, value, onChange }) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const handleSend = () => {
         if (value.trim() && !disabled) {
             onSend(value)
-            setValue('')
+            onChange('')
         }
     }
 
@@ -24,6 +26,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
             handleSend()
         }
     }
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+        }
+    }, [value])
 
     return (
         <div className="chat-input-wrapper">
@@ -36,19 +45,22 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
                 </button>
 
                 <textarea
+                    ref={textareaRef}
                     className="chat-textarea"
                     rows={1}
                     placeholder="Ask about inventory or payments..."
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={disabled}
+                    data-testid="chat-input"
                 />
 
                 <button
                     className="send-btn"
                     onClick={handleSend}
                     disabled={!value.trim() || disabled}
+                    data-testid="chat-send-button"
                 >
                     <Send size={18} />
                 </button>

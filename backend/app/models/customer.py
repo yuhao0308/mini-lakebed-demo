@@ -4,7 +4,7 @@ Customer Profile Pydantic models.
 Per 03_implementation_dummy_data_plan.md §1.1 CustomerProfile
 """
 
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
@@ -143,8 +143,7 @@ class CustomerProfile(BaseModel):
             raise ValueError('Customer ID must be a valid UUID v4')
         return v
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CustomerCreate(BaseModel):

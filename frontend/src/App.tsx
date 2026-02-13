@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import Layout from './components/Layout/Layout'
-import Explorer from './components/Explorer/Explorer'
-import ChatPane from './components/Chat/ChatPane'
-import Dashboard from './components/Dashboard/Dashboard'
-import AuditLogs from './components/Dashboard/AuditLogs'
+import { LanguageProvider } from './hooks/useLanguage'
+
+const Explorer = lazy(() => import('./components/Explorer/Explorer'))
+const ChatPane = lazy(() => import('./components/Chat/ChatPane'))
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
+const AuditLogs = lazy(() => import('./components/Dashboard/AuditLogs'))
 
 function App() {
   const [activeView, setActiveView] = useState('explorer')
@@ -24,9 +26,13 @@ function App() {
   }
 
   return (
-    <Layout activeView={activeView} onViewChange={setActiveView}>
-      {renderView()}
-    </Layout>
+    <LanguageProvider>
+      <Layout activeView={activeView} onViewChange={setActiveView}>
+        <Suspense fallback={<div>Loading view...</div>}>
+          {renderView()}
+        </Suspense>
+      </Layout>
+    </LanguageProvider>
   )
 }
 

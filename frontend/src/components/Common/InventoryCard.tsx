@@ -6,11 +6,16 @@ import './InventoryCard.css'
 interface InventoryCardProps {
     vehicle: Vehicle
     onClick?: () => void
+    index?: number
 }
 
-const InventoryCard: React.FC<InventoryCardProps> = ({ vehicle, onClick }) => {
+const InventoryCard: React.FC<InventoryCardProps> = ({ vehicle, onClick, index }) => {
     return (
-        <div className="inventory-card" onClick={onClick}>
+        <div
+            className="inventory-card"
+            onClick={onClick}
+            data-testid={`inventory-card${index !== undefined ? `-${index}` : ''}`}
+        >
             <div className="card-top">
                 <div className="vehicle-icon">
                     <Car size={20} />
@@ -21,9 +26,9 @@ const InventoryCard: React.FC<InventoryCardProps> = ({ vehicle, onClick }) => {
             </div>
 
             <div className="card-main">
-                <h4 className="vehicle-title">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
+                <h4 className="vehicle-title" data-testid="vehicle-title">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
                 <div className="vehicle-stats">
-                    <div className="stat-item">
+                    <div className="stat-item" data-testid="vehicle-body-style">
                         <Tag size={12} />
                         <span>{vehicle.body_style}</span>
                     </div>
