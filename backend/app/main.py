@@ -53,6 +53,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
+        "https://mini-lakebed-demo-production.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -67,6 +68,8 @@ TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET")
 @app.middleware("http")
 async def tunnel_secret_middleware(request: Request, call_next):
     """Block requests missing the shared tunnel secret (when configured)."""
+    if request.method == "OPTIONS":
+        return await call_next(request)
     if TUNNEL_SECRET and request.headers.get("X-Tunnel-Secret") != TUNNEL_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
     return await call_next(request)
