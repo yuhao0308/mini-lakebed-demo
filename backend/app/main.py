@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
@@ -24,6 +25,7 @@ from app.services.database import init_database
 from app.middleware.pii_scrubber import get_pii_scrubber
 
 logger = logging.getLogger(__name__)
+TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET", "")
 
 
 @asynccontextmanager
@@ -67,11 +69,9 @@ TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET")
 
 @app.middleware("http")
 async def tunnel_secret_middleware(request: Request, call_next):
-    """Block requests missing the shared tunnel secret (when configured)."""
-    if request.method == "OPTIONS":
-        return await call_next(request)
-    if TUNNEL_SECRET and request.headers.get("X-Tunnel-Secret") != TUNNEL_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    if request.method != "OPTIONS" and TUNNEL_SECRET:
+        if request.headers.get("X-Tunnel-Secret") != TUNNEL_SECRET:
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})  # ← correct
     return await call_next(request)
 
 
