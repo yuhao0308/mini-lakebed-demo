@@ -7,20 +7,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
-            return 'react-vendor'
-          }
-          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-gfm')) {
-            return 'markdown-vendor'
-          }
-          if (id.includes('node_modules/recharts')) {
-            return 'charts-vendor'
-          }
-          if (id.includes('node_modules/lucide-react')) {
-            return 'icons-vendor'
-          }
-          return undefined
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'charts-vendor': ['recharts'],
+          'markdown-vendor': ['react-markdown', 'remark-gfm'],
+          'icons-vendor': ['lucide-react'],
         },
       },
     },
