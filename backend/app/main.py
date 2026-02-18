@@ -7,7 +7,13 @@ A governed agentic AI demo for automotive inventory Q&A and payment estimates.
 T05: Added PII scrubber middleware for governance.
 """
 
-from fastapi import FastAPI, Request
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
@@ -52,6 +58,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Tunnel shared-secret middleware - protect public tunnel endpoint
+TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET")
+
+
+@app.middleware("http")
+async def tunnel_secret_middleware(request: Request, call_next):
+    """Block requests missing the shared tunnel secret (when configured)."""
+    if TUNNEL_SECRET and request.headers.get("X-Tunnel-Secret") != TUNNEL_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return await call_next(request)
 
 
 # T05: PII Scrubber middleware - attaches scrubber to request state
