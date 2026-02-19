@@ -2,20 +2,19 @@
 Mini-Lakebed Demo MVP - FastAPI Application
 A governed agentic AI demo for automotive inventory Q&A and payment estimates.
 
-⚠️ DEMO ONLY: All lender rules and rates are SYNTHETIC.
+DEMO ONLY: All lender rules and rates are SYNTHETIC.
 
 T05: Added PII scrubber middleware for governance.
 """
 
-import os
-
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import asyncio
 import logging
@@ -26,6 +25,10 @@ from app.middleware.pii_scrubber import get_pii_scrubber
 
 logger = logging.getLogger(__name__)
 TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET", "")
+
+# Tunnel secret disabled — CORS origin allowlist is the access control for demo.
+# Hard-coded to empty so a stale shell export can never re-enable blocking.
+TUNNEL_SECRET = ""
 
 
 @asynccontextmanager
@@ -40,6 +43,14 @@ async def lifespan(app: FastAPI):
     yield
 
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "https://mini-lakebed-demo-production.up.railway.app",
+]
+
 app = FastAPI(
     title="Mini-Lakebed Demo",
     description="Governed agentic AI for automotive inventory Q&A and payment estimates. DEMO ONLY.",
@@ -47,31 +58,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-        "https://mini-lakebed-demo-production.up.railway.app",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-
-# Tunnel shared-secret middleware - protect public tunnel endpoint
-TUNNEL_SECRET = os.environ.get("TUNNEL_SECRET")
-
-
+# Registered before CORSMiddleware so that CORS becomes the outermost layer.
+# Any early-exit response (e.g. 403) will still receive CORS headers because
+# CORSMiddleware wraps the entire stack.
 @app.middleware("http")
 async def tunnel_secret_middleware(request: Request, call_next):
+    """Block requests missing the shared tunnel secret (when configured)."""
     if request.method != "OPTIONS" and TUNNEL_SECRET:
         if request.headers.get("X-Tunnel-Secret") != TUNNEL_SECRET:
-            return JSONResponse(status_code=403, content={"detail": "Forbidden"})  # ← correct
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
     return await call_next(request)
 
 
@@ -88,13 +84,27 @@ async def pii_scrubbing_middleware(request: Request, call_next):
     return response
 
 
+# CORSMiddleware registered last → becomes outermost layer → CORS headers are
+# added to every response, including early-exit 403s from tunnel_secret_middleware.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    # Allow any Cloudflare free-tunnel URL so VITE_API_BASE_URL changes
+    # on each tunnel restart don't require a Railway rebuild.
+    allow_origin_regex=r"https://.*\.trycloudflare\.com",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(inventory.router, prefix="/api", tags=["Inventory"])
 app.include_router(payments.router, prefix="/api", tags=["Payments"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
-app.include_router(consent.router, prefix="/api", tags=["Consent"])  # T03: FCRA consent
-app.include_router(documents.router, prefix="/api", tags=["Documents"])  # T06: PDF generation
+app.include_router(consent.router, prefix="/api", tags=["Consent"])
+app.include_router(documents.router, prefix="/api", tags=["Documents"])
 
 
 @app.get("/")

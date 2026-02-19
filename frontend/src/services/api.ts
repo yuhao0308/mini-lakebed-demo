@@ -1,14 +1,12 @@
 import type { Lake, Zone, Asset } from '../types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const TUNNEL_SECRET: string = import.meta.env.VITE_TUNNEL_SECRET || '';
+const TUNNEL_SECRET = import.meta.env.VITE_TUNNEL_SECRET || '';
 
-function authHeaders(): Record<string, string> {
-    return TUNNEL_SECRET ? { 'X-Tunnel-Secret': TUNNEL_SECRET } : {};
-}
-
-function jsonHeaders(): Record<string, string> {
-    return { 'Content-Type': 'application/json', ...authHeaders() };
+function apiHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+    if (TUNNEL_SECRET) headers['X-Tunnel-Secret'] = TUNNEL_SECRET;
+    return headers;
 }
 
 const MOCK_LAKES: Lake[] = [
@@ -65,7 +63,7 @@ export const apiService = {
     sendChat: async (message: string, sessionId: string) => {
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
-            headers: jsonHeaders(),
+            headers: apiHeaders(),
             body: JSON.stringify({ message, session_id: sessionId })
         });
         return response.json();
@@ -75,7 +73,7 @@ export const apiService = {
     submitConsent: async (customerId: string, consentType: string = 'soft_pull', legalTextVersion: string = 'v2026.1') => {
         const response = await fetch(`${API_BASE_URL}/api/consent`, {
             method: 'POST',
-            headers: jsonHeaders(),
+            headers: apiHeaders(),
             body: JSON.stringify({
                 customer_id: customerId,
                 consent_type: consentType,
@@ -88,7 +86,7 @@ export const apiService = {
     // T03: Check consent status
     checkConsent: async (customerId: string) => {
         const response = await fetch(`${API_BASE_URL}/api/consent/check/${customerId}`, {
-            headers: authHeaders()
+            headers: apiHeaders()
         });
         return response.json();
     },
@@ -96,7 +94,7 @@ export const apiService = {
     // T03: Get consent legal text
     getConsentLegalText: async (version: string = 'v2026.1', dealerName: string = 'Mini-Lakebed Demo Dealer') => {
         const response = await fetch(`${API_BASE_URL}/api/consent/legal-text?version=${version}&dealer_name=${encodeURIComponent(dealerName)}`, {
-            headers: authHeaders()
+            headers: apiHeaders()
         });
         return response.json();
     },
@@ -105,7 +103,7 @@ export const apiService = {
     downloadAdverseActionPdf: async (noticeData: any, language: string = 'en') => {
         const response = await fetch(`${API_BASE_URL}/api/documents/adverse-action/pdf`, {
             method: 'POST',
-            headers: jsonHeaders(),
+            headers: apiHeaders(),
             body: JSON.stringify({ ...noticeData, language })
         });
         return response.blob();
@@ -115,7 +113,7 @@ export const apiService = {
     downloadOfferingPricePdf: async (vehicle: any, components: any, language: string = 'en') => {
         const response = await fetch(`${API_BASE_URL}/api/documents/offering-price/pdf`, {
             method: 'POST',
-            headers: jsonHeaders(),
+            headers: apiHeaders(),
             body: JSON.stringify({ vehicle, components, language })
         });
         return response.blob();
@@ -124,7 +122,7 @@ export const apiService = {
     // T06: Get sample adverse action PDF
     getSampleAdverseActionPdf: async (language: string = 'en') => {
         const response = await fetch(`${API_BASE_URL}/api/documents/adverse-action/sample?language=${language}`, {
-            headers: authHeaders()
+            headers: apiHeaders()
         });
         return response.blob();
     },
@@ -132,7 +130,7 @@ export const apiService = {
     // T06: Get sample offering price PDF
     getSampleOfferingPricePdf: async (language: string = 'en') => {
         const response = await fetch(`${API_BASE_URL}/api/documents/offering-price/sample?language=${language}`, {
-            headers: authHeaders()
+            headers: apiHeaders()
         });
         return response.blob();
     }
